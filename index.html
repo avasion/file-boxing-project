@@ -269,6 +269,13 @@
   #loadingMsg.show, #errorMsg.show { display:flex; }
   #errorMsg { color:#ff2a34; }
 </style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"
+    }
+  }
+</script>
 </head>
 <body>
 <div id="app">
@@ -506,13 +513,12 @@ window.THREE_LOAD_PROMISE = new Promise((resolve, reject) => {
   throw err;
 });
 
-window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => new Promise((resolve, reject) => {
-  const loaderScript = document.createElement('script');
-  loaderScript.src = 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/FBXLoader.js';
-  loaderScript.onload = resolve;
-  loaderScript.onerror = () => reject(new Error('Failed to load FBXLoader'));
-  document.head.appendChild(loaderScript);
-})).catch(err => {
+window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => {
+  return import('https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/FBXLoader.js')
+    .then(module => {
+      window.THREE.FBXLoader = module.FBXLoader;
+    });
+}).catch(err => {
   document.getElementById('loadingMsg').classList.remove('show');
   document.getElementById('errorMsg').classList.add('show');
   document.getElementById('errorMsg').textContent = 'ERROR: Failed to load FBXLoader. Check your internet connection.';
