@@ -484,6 +484,60 @@
 
 <!-- LOAD THREE.JS WITH MULTI-CDN FALLBACK -->
 <script>
+// --- Audio: preload and playback helpers ---
+window.AUDIO = (function(){
+  const sounds = {
+    menu: 'sound/Menu Music.wav',
+    REAPER: 'sound/Travis Scott - SICKO MODE (Instrumental).mp3',
+    PHOENIX: 'sound/DMX - Ruff Ryders Anthem.mp3',
+    VIPER: 'sound/Kodak Black - ZEZE.mp3',
+    SHOCKWAVE: 'sound/50 Cent - Many Men) (Instrumental).mp3'
+  };
+
+  const audioEls = {};
+  // Preload
+  Object.keys(sounds).forEach(k => {
+    const src = sounds[k];
+    const a = new Audio(src);
+    a.preload = 'auto';
+    a.loop = (k === 'menu');
+    a.volume = (k === 'menu') ? 0.45 : 0.9;
+    audioEls[k] = a;
+  });
+
+  let current = null;
+
+  function fadeOut(a, t=400){
+    if(!a) return Promise.resolve();
+    const start = a.volume;
+    const step = 50;
+    return new Promise(res=>{
+      const s = Date.now();
+      const iv = setInterval(()=>{
+        const p = Math.min(1,(Date.now()-s)/t);
+        a.volume = start*(1-p);
+        if(p>=1){ clearInterval(iv); try{a.pause(); a.currentTime=0;}catch(e){}; a.volume = start; res(); }
+      }, step);
+    });
+  }
+
+  function play(key, {fadeMenu=false} = {}){
+    if(!audioEls[key]) return;
+    const next = audioEls[key];
+    // stop current (menu or previous walkout)
+    if(current && current!==next){
+      try{ current.pause(); current.currentTime = 0; }catch(e){}
+    }
+    current = next;
+    try{ next.volume = next.volume; next.play(); }catch(e){}
+  }
+
+  function stopAll(){ Object.values(audioEls).forEach(a=>{ try{a.pause(); a.currentTime=0;}catch(e){} }); current=null; }
+
+  return { play, stopAll, audioEls };
+})();
+</script>
+<script>
 window.THREE_LOAD_PROMISE = new Promise((resolve, reject) => {
   const cdns = [
     'https://unpkg.com/three@0.150.1/build/three.min.js',
@@ -535,6 +589,8 @@ window.FBX_LOADER_PROMISE.then(() => {
 }).catch(() => {});
 
 function initializeGame() {
+  // start menu music
+  try{ if(window.AUDIO) window.AUDIO.play('menu'); }catch(e){}
 
 const CHARACTERS = [
   { name:'BLAZE',     color:0x2196f3, dark:0x0d3a63, overall:92 },
@@ -1108,6 +1164,11 @@ function runEntranceSequence(){
   }
 
   async function walkOn(fighter, label){
+    // play walkout music for this fighter (if available)
+    try{
+      const key = (fighter.name||'').toUpperCase();
+      if(window.AUDIO) window.AUDIO.play(key);
+    }catch(e){}
     nowEl.style.opacity=0;
     whoEl.style.opacity=0;
     whoEl.textContent = label;
@@ -1202,6 +1263,8 @@ function beginFight(){
   fCamera.position.set(0,3.6,9.5);
   fCamera.lookAt(0,1.4,0);
   showBigText('FIGHT!',1200);
+  // stop walkout/menu music when fight begins
+  try{ if(window.AUDIO) window.AUDIO.stopAll(); }catch(e){}
   fightActive = true;
   clock.getDelta();
 }
