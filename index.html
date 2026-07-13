@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IGNITE BOXING</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;500;600;700&display=swap');
+
+  :root{
+    --bg:#0a0a0d;
+    --panel:#111114;
+    --panel2:#17171b;
+    --line:#2a2a30;
+    --red:#c0141c;
+    --red-bright:#ff2a34;
+    --gold:#d4af37;
+    --text:#e9e9ec;
+    --muted:#8a8a92;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    width:100%; height:100%; background:var(--bg); color:var(--text);
+    font-family:'Oswald',sans-serif; overflow:hidden;
+  }
+  .display{font-family:'Bebas Neue',sans-serif; letter-spacing:1px;}
+
+  #app{ position:fixed; inset:0; }
+
+  /* ---------- MENU SCREEN ---------- */
+  #menuScreen{
+    position:absolute; inset:0;
+    display:grid;
+    grid-template-columns: 260px 1fr 300px;
+    grid-template-rows: 1fr auto;
+    gap:14px;
+    padding:18px;
+    background:
+      radial-gradient(ellipse at 50% -10%, #241014 0%, transparent 55%),
+      linear-gradient(180deg,#08080a,#0a0a0d 40%);
+  }
+  .panel{
+    background: linear-gradient(180deg, var(--panel), #0c0c0f);
+    border:1px solid var(--line);
+    position:relative;
+    overflow:hidden;
+  }
+  .panel::before{
+    content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background:linear-gradient(180deg, var(--red-bright), transparent);
+  }
+
+  /* left column */
+  #leftCol{ display:flex; flex-direction:column; gap:14px; grid-row:1/2; }
+  .menuTitle{ font-size:26px; padding:14px 18px 4px; color:var(--muted); letter-spacing:3px;}
+  #mainMenuList{ list-style:none; padding:10px; display:flex; flex-direction:column; gap:4px;}
+  #mainMenuList li{
+    padding:14px 16px; font-size:20px; letter-spacing:2px; color:var(--muted);
+    cursor:pointer; transition:.15s; border-left:4px solid transparent;
+  }
+  #mainMenuList li:hover:not(.active){
+    color:#aaa;
+  }
+  #mainMenuList li.active{
+    background:linear-gradient(90deg, var(--red), #7a0d12 90%);
+    color:#fff; border-left:4px solid var(--gold);
+  }
+  #backstagePanel{ flex:1; min-height:0; padding-bottom:10px;}
+  #backstagePanel .menuTitle{ font-size:20px; }
+  .backstageArt{
+    height:calc(100% - 40px); margin:0 10px 10px;
+    background:
+      repeating-linear-gradient(90deg, #1c1c20 0 2px, transparent 2px 40px),
+      linear-gradient(180deg,#151518,#0a0a0c 70%);
+    border:1px solid var(--line);
+    position:relative;
+    overflow:hidden;
+  }
+  .backstageArt::after{
+    content:'LOCKER ROOM'; position:absolute; right:10px; top:10px;
+    font-size:10px; letter-spacing:2px; color:#553; background:#1a0d0e; padding:4px 8px; border:1px solid #3a1a1c;
+    z-index:2;
+  }
+  .backstageArt .doorGlow{
+    position:absolute; left:14px; bottom:14px; width:26px; height:60px;
+    background:linear-gradient(180deg,#ff3b3b,#5a0a0a); box-shadow:0 0 24px 4px rgba(255,40,40,.5);
+    display:none;
+  }
+
+  /* Menu Pages in Backstage */
+  .backstagePage{ position:absolute; inset:0; display:none; flex-direction:column; padding:14px; overflow-y:auto; z-index:1; }
+  .backstagePage.active{ display:flex; }
+  .backstagePage::-webkit-scrollbar{ width:6px; }
+  .backstagePage::-webkit-scrollbar-track{ background:#0a0a0d; }
+  .backstagePage::-webkit-scrollbar-thumb{ background:#2a2a30; }
+
+  .pageTitle{ font-size:14px; letter-spacing:2px; color:var(--gold); margin-bottom:10px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .statRow{ display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:11px; color:var(--muted); border-bottom:1px solid rgba(42,42,48,0.4); }
+  .statRow .label{ font-weight:600; }
+  .statRow .val{ color:#fff; font-family:'Bebas Neue'; }
+  .statRow.highlight{ background:rgba(192,20,28,0.15); padding:8px; margin:4px 0; border:1px solid var(--line); border-bottom:1px solid var(--line); }
+
+  .scoreboard{ width:100%; }
+  .scoreRow{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; padding:8px; background:rgba(0,0,0,0.3); border:1px solid var(--line); }
+  .scoreEntry{ text-align:center; }
+  .scoreEntry .name{ font-size:12px; font-weight:600; color:var(--muted); margin-bottom:4px; letter-spacing:1px; }
+  .scoreEntry .score{ font-size:18px; font-family:'Bebas Neue'; color:#fff; text-shadow:0 0 10px rgba(192,20,28,0.5); }
+
+  .charGrid{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .charCard{ background:rgba(0,0,0,0.4); border:1px solid var(--line); padding:8px; text-align:center; }
+  .charCard .cName{ font-size:12px; font-weight:600; color:#fff; margin-bottom:4px; }
+  .charCard .cStat{ font-size:10px; color:var(--muted); }
+  .charCard .cOv{ font-size:14px; font-family:'Bebas Neue'; color:var(--gold); margin-top:4px; }
+
+  /* center column: arena preview */
+  #arenaPreview{
+    grid-row:1/2; position:relative;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(80,90,200,.25), transparent 60%),
+      radial-gradient(ellipse at 20% 10%, rgba(200,40,60,.25), transparent 55%),
+      linear-gradient(180deg, #0d0d12, #030304 75%);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  #arenaPreview canvas{ position:absolute; inset:0; width:100%; height:100%; }
+  #arenaLabel{
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    text-align:center; z-index:2;
+  }
+  #arenaLabel .brand{ font-size:44px; letter-spacing:6px; color:#fff; text-shadow:0 0 20px rgba(255,60,60,.6);}
+  #arenaLabel .sub{ font-size:13px; letter-spacing:8px; color:var(--gold); }
+  #chooseLabel{
+    position:absolute; bottom:0; left:0; right:0; text-align:center;
+    background:linear-gradient(0deg, rgba(0,0,0,.85), transparent);
+    padding:22px 0 10px; font-size:20px; letter-spacing:5px; color:#fff; z-index:2;
+  }
+
+  /* right column: match setup */
+  #setupPanel{ grid-row:1/2; padding:14px 16px; display:flex; flex-direction:column;}
+  .setupRow{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 4px; border-bottom:1px solid var(--line); font-size:14px; letter-spacing:1px;
+  }
+  .setupRow .label{ color:var(--muted); }
+  .setupRow .val{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:600;}
+  .stepBtn{
+    width:22px; height:22px; border:1px solid var(--line); background:#1c1c20; color:#fff;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px;
+    user-select:none;
+  }
+  .stepBtn:hover{ background:var(--red); border-color:var(--red); }
+  .toggleChip{
+    padding:4px 10px; border:1px solid var(--line); font-size:12px; cursor:pointer; color:var(--muted);
+  }
+  .toggleChip.on{ background:var(--red); color:#fff; border-color:var(--red-bright); }
+  #startMatchBtn{
+    margin-top:auto; padding:18px; text-align:center; font-size:22px; letter-spacing:4px;
+    background:linear-gradient(180deg,#e21c26,#7c0d12); border:1px solid #ff4b52; color:#fff;
+    cursor:pointer; box-shadow:0 0 25px rgba(220,20,30,.35); transition:.15s;
+  }
+  #startMatchBtn:hover{ filter:brightness(1.15); }
+  #startMatchBtn.disabled{ opacity:.35; pointer-events:none; box-shadow:none; }
+
+  /* bottom: character select */
+  #selectBar{ grid-column:1/4; display:flex; flex-direction:column; gap:8px; }
+  #selectTabs{ display:flex; gap:10px; align-items:center; justify-content:center; }
+  .slotTab{
+    padding:8px 22px; font-size:14px; letter-spacing:3px; cursor:pointer;
+    border:1px solid var(--line); background:#0e0e11; color:var(--muted);
+  }
+  .slotTab.p1.active{ border-color:#2196f3; color:#2196f3; background:#0d1620; }
+  #vsPreview{ display:flex; align-items:center; justify-content:center; gap:16px; font-size:13px; color:var(--muted); letter-spacing:2px;}
+  #vsPreview .pName{ font-size:18px; }
+  #vsPreview .p1c{ color:#2196f3; } #vsPreview .p2c{ color:#ff2a34; }
+  #vsPreview .vsDivider{ color:var(--gold); font-size:20px; }
+
+  #cardGrid{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .card{
+    width:112px; height:158px; position:relative; cursor:pointer;
+    border:1px solid var(--line); overflow:hidden;
+    transition:transform .12s, border-color .12s;
+  }
+  .card:hover{ transform:translateY(-4px); }
+  .card.selP1{ border:2px solid #2196f3; box-shadow:0 0 14px rgba(33,150,243,.55);}
+  .card.selP2{ border:2px solid #ff2a34; box-shadow:0 0 14px rgba(255,42,52,.55);}
+  .card .art{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .card .art .initial{ font-size:64px; font-family:'Bebas Neue'; opacity:.9; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.6);}
+  .card .grad{ position:absolute; inset:0; }
+  .card .info{
+    position:absolute; left:0; right:0; bottom:0; padding:6px 8px 8px;
+    background:linear-gradient(0deg, rgba(0,0,0,.85), transparent 80%);
+  }
+  .card .name{ font-size:14px; letter-spacing:1px; font-weight:700; }
+  .card .ov{ font-size:10px; color:var(--muted); display:flex; justify-content:space-between; margin-top:2px;}
+  .card .ov b{ color:#fff; font-size:14px; }
+  .card .cpuTag{
+    position:absolute; top:6px; right:6px; font-size:9px; letter-spacing:1px; color:#ff2a34;
+    background:rgba(20,5,6,.85); border:1px solid #ff2a34; padding:2px 5px; display:none;
+  }
+  .card.selP2 .cpuTag{ display:block; }
+
+  /* ---------- FIGHT SCREEN ---------- */
+  #fightScreen{ position:absolute; inset:0; display:none; }
+  #fightScreen canvas{ position:absolute; inset:0; width:100%; height:100%; display:block;}
+
+  #hud{ position:absolute; top:0; left:0; right:0; padding:18px 26px; display:flex; align-items:flex-start; justify-content:space-between; z-index:5; pointer-events:none;}
+  .hpBlock{ width:34%; }
+  .hpName{ display:flex; justify-content:space-between; font-size:16px; letter-spacing:2px; margin-bottom:4px;}
+  .hpBar{ height:16px; background:#1a1a1e; border:1px solid #333; position:relative; }
+  .hpFill{ height:100%; width:100%; transition:width .15s; }
+  .p1 .hpFill{ background:linear-gradient(90deg,#0d63c9,#4fb2ff); }
+  .p2 .hpFill{ background:linear-gradient(90deg,#ff5158,#c9130d); margin-left:auto; }
+  .p2 .hpBar{ direction:rtl; }
+  .p1 .hpName{ color:#4fb2ff; }
+  .p2 .hpName{ color:#ff5158; }
+  #clock{ font-family:'Bebas Neue'; font-size:40px; letter-spacing:2px; color:#fff; text-shadow:0 0 10px rgba(0,0,0,.8); }
+  #clockWrap{ text-align:center; }
+  #roundLabel{ font-size:11px; letter-spacing:4px; color:var(--gold); text-align:center; }
+
+  #controlsHint{
+    position:absolute; bottom:14px; left:0; right:0; display:flex; justify-content:center; padding:0 26px;
+    font-size:11px; letter-spacing:1px; color:#aaa; z-index:5; pointer-events:none;
+  }
+  #controlsHint span{ background:rgba(0,0,0,.45); padding:4px 8px; border:1px solid #2a2a30; }
+
+  #centerText{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    z-index:6; pointer-events:none;
+  }
+  #centerText .big{
+    font-family:'Bebas Neue'; font-size:100px; letter-spacing:8px; color:#fff;
+    text-shadow: 0 0 30px rgba(255,40,40,.8), 0 0 6px #000;
+    opacity:0; transform:scale(.8);
+  }
+  #entranceCaption{
+    position:absolute; bottom:14%; left:0; right:0; text-align:center; z-index:6; pointer-events:none;
+  }
+  #entranceCaption .now{ font-size:14px; letter-spacing:6px; color:var(--gold); opacity:0;}
+  #entranceCaption .who{ font-size:64px; font-family:'Bebas Neue'; letter-spacing:4px; color:#fff; opacity:0; text-shadow:0 0 20px rgba(0,0,0,.9);}
+
+  #skipHint{
+    position:absolute; top:16px; right:20px; font-size:11px; letter-spacing:2px; color:#888;
+    border:1px solid #333; padding:6px 10px; cursor:pointer; z-index:7; background:rgba(0,0,0,0.4);
+  }
+
+  /* ---------- RESULT SCREEN ---------- */
+  #resultScreen{
+    position:absolute; inset:0; z-index:10; display:none;
+    align-items:center; justify-content:center; flex-direction:column; gap:18px;
+    background:radial-gradient(ellipse at 50% 40%, rgba(60,10,12,.55), rgba(0,0,0,.92));
+  }
+  #resultTitle{ font-family:'Bebas Neue'; font-size:70px; letter-spacing:6px; color:var(--gold); text-shadow:0 0 30px rgba(212,175,55,.6);}
+  #resultSub{ font-size:16px; letter-spacing:4px; color:var(--muted); }
+  #resultWinner{ font-family:'Bebas Neue'; font-size:54px; letter-spacing:3px; color:#fff; }
+  .resultBtns{ display:flex; gap:16px; margin-top:14px; }
+  .resultBtn{
+    padding:14px 30px; font-size:15px; letter-spacing:3px; cursor:pointer;
+    background:#161619; border:1px solid var(--line); color:#fff;
+  }
+  .resultBtn.primary{ background:linear-gradient(180deg,#e21c26,#7c0d12); border-color:#ff4b52; }
+
+  .hidden{ display:none !important; }
+
+  /* Loading/Error Messages */
+  #loadingMsg, #errorMsg {
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    z-index:20; background:rgba(0,0,0,0.9);
+    font-size:18px; color:#fff; text-align:center; padding:40px;
+  }
+  #loadingMsg.show, #errorMsg.show { display:flex; }
+  #errorMsg { color:#ff2a34; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= MENU SCREEN ================= -->
+  <div id="menuScreen">
+    <div id="leftCol">
+      <div class="panel">
+        <div class="menuTitle">MAIN MENU</div>
+        <ul id="mainMenuList">
+          <li class="active">PLAY</li>
+          <li>CAREER</li>
+          <li>SUPERSTARS</li>
+          <li>OPTIONS</li>
+          <li>EXIT</li>
+        </ul>
+      </div>
+      <div class="panel" id="backstagePanel">
+        <div class="menuTitle">BACKSTAGE</div>
+        <div class="backstageArt">
+          <div class="doorGlow"></div>
+
+          <!-- PLAY Page (default) -->
+          <div id="page-play" class="backstagePage active">
+            <div class="pageTitle">QUICK START</div>
+            <div class="statRow">
+              <span class="label">MATCHES PLAYED</span>
+              <span class="val" id="stat-matchesPlayed">0</span>
+            </div>
+            <div class="statRow">
+              <span class="label">CURRENT STREAK</span>
+              <span class="val" id="stat-streak">0</span>
+            </div>
+            <div class="statRow">
+              <span class="label">TOTAL KOS</span>
+              <span class="val" id="stat-kos">0</span>
+            </div>
+            <div class="statRow highlight">
+              <span class="label">LAST RESULT</span>
+              <span class="val" id="stat-lastResult">—</span>
+            </div>
+          </div>
+
+          <!-- CAREER Page -->
+          <div id="page-career" class="backstagePage">
+            <div class="pageTitle">CAREER SCOREBOARD</div>
+            <div class="scoreboard" id="careerScoreboard">
+              <div class="scoreRow">
+                <div class="scoreEntry">
+                  <div class="name">WINS</div>
+                  <div class="score" id="score-wins">0</div>
+                </div>
+                <div class="scoreEntry">
+                  <div class="name">LOSSES</div>
+                  <div class="score" id="score-losses">0</div>
+                </div>
+              </div>
+              <div class="scoreRow">
+                <div class="scoreEntry">
+                  <div class="name">KO RATIO</div>
+                  <div class="score" id="score-koratio">0%</div>
+                </div>
+                <div class="scoreEntry">
+                  <div class="name">TOTAL DAMAGE</div>
+                  <div class="score" id="score-damage">0</div>
+                </div>
+              </div>
+            </div>
+            <div class="pageTitle" style="margin-top:12px;">RECENT FIGHTS</div>
+            <div id="recentFights"></div>
+          </div>
+
+          <!-- SUPERSTARS Page -->
+          <div id="page-superstars" class="backstagePage">
+            <div class="pageTitle">FIGHTER ROSTER</div>
+            <div class="charGrid" id="rosterGrid"></div>
+          </div>
+
+          <!-- OPTIONS Page -->
+          <div id="page-options" class="backstagePage">
+            <div class="pageTitle">SETTINGS</div>
+            <div class="statRow">
+              <span class="label">DIFFICULTY</span>
+              <span class="val">NORMAL</span>
+            </div>
+            <div class="statRow">
+              <span class="label">GRAPHICS</span>
+              <span class="val">HIGH</span>
+            </div>
+            <div class="statRow">
+              <span class="label">SOUND</span>
+              <span class="val">ON</span>
+            </div>
+            <div class="statRow">
+              <span class="label">VERSION</span>
+              <span class="val">1.0</span>
+            </div>
+            <div class="pageTitle" style="margin-top:12px;">INFO</div>
+            <div class="statRow">
+              <span class="label">DEV TEAM</span>
+              <span class="val" style="font-size:9px;">IGNITE LABS</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="arenaPreview">
+      <canvas id="previewCanvas"></canvas>
+      <div id="arenaLabel">
+        <div class="brand display">IGNITE</div>
+        <div class="sub">BOXING</div>
+      </div>
+      <div id="chooseLabel" class="display">CHOOSE YOUR BOXER</div>
+    </div>
+
+    <div class="panel" id="setupPanel">
+      <div class="menuTitle" style="font-size:20px;">MATCH SETUP</div>
+      <div class="setupRow"><span class="label">MATCH TYPE</span><span class="val">1 PLAYER VS CPU</span></div>
+      <div class="setupRow">
+        <span class="label">TIME LIMIT</span>
+        <span class="val">
+          <span class="stepBtn" id="timeDown">&#10094;</span>
+          <span id="timeVal">2:00</span>
+          <span class="stepBtn" id="timeUp">&#10095;</span>
+        </span>
+      </div>
+      <div class="setupRow">
+        <span class="label">WIN CONDITION</span>
+        <span class="val" style="font-size:12px; color:var(--muted);">KO or Decision</span>
+      </div>
+      <div class="setupRow">
+        <span class="label">ENTRANCE</span>
+        <span class="val"><span class="toggleChip on" id="entranceToggle">ON</span></span>
+      </div>
+      <div class="setupRow" style="border-bottom:none;">
+        <span class="label">CONTROLS</span>
+        <span class="val" style="font-size:11px; color:var(--muted); text-align:right;">MOVE&#58; WASD<br>JAB&#58; J&#8195;POWER PUNCH&#58; K&#8195;BLOCK&#58; SHIFT</span>
+      </div>
+      <div id="startMatchBtn" class="display disabled">START MATCH</div>
+    </div>
+
+    <div id="selectBar">
+      <div id="selectTabs">
+        <div class="slotTab p1 active" id="tabP1">YOUR BOXER</div>
+        <div id="vsPreview">
+          <span id="vsP1" class="pName p1c">—</span>
+          <span class="vsDivider display">VS</span>
+          <span id="vsP2" class="pName p2c">CPU</span>
+        </div>
+      </div>
+      <div id="cardGrid"></div>
+    </div>
+  </div>
+
+  <!-- ================= FIGHT SCREEN ================= -->
+  <div id="fightScreen">
+    <canvas id="fightCanvas"></canvas>
+
+    <div id="skipHint" class="hidden">SKIP ENTRANCE &#9658;</div>
+
+    <div id="entranceCaption">
+      <div class="now display">NOW ENTERING</div>
+      <div class="who display"></div>
+    </div>
+
+    <div id="hud" class="hidden">
+      <div class="hpBlock p1">
+        <div class="hpName"><span id="p1Name">YOU</span><span id="p1Pct">100</span></div>
+        <div class="hpBar"><div class="hpFill" id="p1Fill"></div></div>
+      </div>
+      <div id="clockWrap">
+        <div id="roundLabel">VS CPU</div>
+        <div id="clock">2:00</div>
+      </div>
+      <div class="hpBlock p2">
+        <div class="hpName"><span id="p2Pct">100</span><span id="p2Name">CPU</span></div>
+        <div class="hpBar"><div class="hpFill" id="p2Fill"></div></div>
+      </div>
+    </div>
+
+    <div id="controlsHint" class="hidden">
+      <span>MOVE&#58;WASD&#8195;JAB&#58;J&#8195;POWER PUNCH&#58;K&#8195;BLOCK&#58;SHIFT</span>
+    </div>
+
+    <div id="centerText"><div class="big display" id="bigText"></div></div>
+  </div>
+
+  <!-- ================= RESULT SCREEN ================= -->
+  <div id="resultScreen">
+    <div id="resultTitle">KNOCKOUT</div>
+    <div id="resultSub">WINNER BY KNOCKOUT</div>
+    <div id="resultWinner">—</div>
+    <div class="resultBtns">
+      <div class="resultBtn primary" id="rematchBtn">REMATCH</div>
+      <div class="resultBtn" id="mainMenuBtn">MAIN MENU</div>
+    </div>
+  </div>
+
+  <!-- Status Messages -->
+  <div id="loadingMsg" class="show">Loading THREE.js library...</div>
+  <div id="errorMsg"></div>
+
+</div>
+
+<!-- LOAD THREE.JS WITH MULTI-CDN FALLBACK -->
+<script>
+window.THREE_LOAD_PROMISE = new Promise((resolve, reject) => {
+  const cdns = [
+    'https://unpkg.com/three@0.150.1/build/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js'
+  ];
+  
+  function attemptLoad(index) {
+    if (index >= cdns.length) {
+      reject(new Error('Failed to load THREE.js from all CDNs'));
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = cdns[index];
+    script.onload = () => resolve(window.THREE);
+    script.onerror = () => attemptLoad(index + 1);
+    document.head.appendChild(script);
+  }
+  
+  attemptLoad(0);
+}).catch(err => {
+  document.getElementById('loadingMsg').classList.remove('show');
+  document.getElementById('errorMsg').classList.add('show');
+  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load THREE.js. Check your internet connection.';
+  console.error('THREE.js loading failed:', err);
+  throw err;
+});
+
+window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => new Promise((resolve, reject) => {
+  const loaderScript = document.createElement('script');
+  loaderScript.src = 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/FBXLoader.js';
+  loaderScript.onload = resolve;
+  loaderScript.onerror = () => reject(new Error('Failed to load FBXLoader'));
+  document.head.appendChild(loaderScript);
+})).catch(err => {
+  document.getElementById('loadingMsg').classList.remove('show');
+  document.getElementById('errorMsg').classList.add('show');
+  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load FBXLoader. Check your internet connection.';
+  console.error('FBXLoader loading failed:', err);
+  throw err;
+});
+</script>
+
+<!-- MAIN GAME CODE (runs after THREE.js loads) -->
+<script>
+window.FBX_LOADER_PROMISE.then(() => {
+  document.getElementById('loadingMsg').classList.remove('show');
+  initializeGame();
+}).catch(() => {});
+
+function initializeGame() {
+
+const CHARACTERS = [
+  { name:'BLAZE',     color:0x2196f3, dark:0x0d3a63, overall:92 },
+  { name:'REAPER',    color:0xd32f2f, dark:0x4a0d0d, overall:90 },
+  { name:'PHOENIX',   color:0xff6f00, dark:0x622900, overall:87 },
+  { name:'TITAN',     color:0x4caf50, dark:0x1c4020, overall:91 },
+  { name:'VIPER',     color:0x9c27b0, dark:0x3a0d47, overall:86 },
+  { name:'KAIJU',     color:0xd4af37, dark:0x4a3c0d, overall:88 },
+  { name:'SHOCKWAVE', color:0x00e5ff, dark:0x003a40, overall:89 },
+];
+
+/* ----- MENU STATE ----- */
+let picks = { p1:null, p2:null };
+let timeOptions = [60,90,120,180,300];
+let timeIdx = timeOptions.indexOf(120);
+let entranceOn = true;
+
+/* ----- CAREER STATS ----- */
+let careerStats = {
+  matchesPlayed: 0,
+  wins: 0,
+  losses: 0,
+  totalKOs: 0,
+  totalDamageDealt: 0,
+  currentStreak: 0,
+  lastResult: '—',
+  recentMatches: []
+};
+
+/* ----- MENU PAGE SWITCHER ----- */
+const menuItems = document.querySelectorAll('#mainMenuList li');
+const backstagePages = document.querySelectorAll('.backstagePage');
+
+function switchPage(pageId) {
+  backstagePages.forEach(p => p.classList.remove('active'));
+  const page = document.getElementById(`page-${pageId}`);
+  if(page) page.classList.add('active');
+}
+
+menuItems.forEach((item, idx) => {
+  const pages = ['play', 'career', 'superstars', 'options', null];
+  item.addEventListener('click', () => {
+    menuItems.forEach(m => m.classList.remove('active'));
+    item.classList.add('active');
+    if(pages[idx]) switchPage(pages[idx]);
+  });
+});
+
+// Init: PLAY is already active
+
+/* ----- POPULATE SUPERSTARS ROSTER ----- */
+function initRoster(){
+  const rosterGrid = document.getElementById('rosterGrid');
+  CHARACTERS.forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'charCard';
+    card.innerHTML = `
+      <div class="cName" style="color:#${c.color.toString(16).padStart(6,'0')}">${c.name}</div>
+      <div class="cStat">RATING</div>
+      <div class="cOv">${c.overall}</div>`;
+    rosterGrid.appendChild(card);
+  });
+}
+
+/* ----- UPDATE CAREER STATS ----- */
+function updateCareerStats(winner, loser, isKO){
+  careerStats.matchesPlayed++;
+  
+  if(winner === p1F){
+    careerStats.wins++;
+    careerStats.currentStreak++;
+    if(isKO) careerStats.totalKOs++;
+    careerStats.lastResult = 'WIN';
+  } else {
+    careerStats.losses++;
+    careerStats.currentStreak = 0;
+    careerStats.lastResult = 'LOSS';
+  }
+  
+  careerStats.recentMatches.unshift({
+    opponent: winner === p1F ? loser.name : winner.name,
+    result: winner === p1F ? 'W' : 'L',
+    method: isKO ? 'KO' : 'DECISION',
+    time: new Date().toLocaleTimeString()
+  });
+  if(careerStats.recentMatches.length > 5) careerStats.recentMatches.pop();
+
+  updateStatsUI();
+}
+
+function updateStatsUI(){
+  document.getElementById('stat-matchesPlayed').textContent = careerStats.matchesPlayed;
+  document.getElementById('stat-streak').textContent = careerStats.currentStreak;
+  document.getElementById('stat-kos').textContent = careerStats.totalKOs;
+  document.getElementById('stat-lastResult').textContent = careerStats.lastResult;
+
+  document.getElementById('score-wins').textContent = careerStats.wins;
+  document.getElementById('score-losses').textContent = careerStats.losses;
+  const koRatio = careerStats.matchesPlayed > 0 ? Math.round((careerStats.totalKOs / careerStats.matchesPlayed)*100) : 0;
+  document.getElementById('score-koratio').textContent = koRatio + '%';
+
+  const recentFightsEl = document.getElementById('recentFights');
+  recentFightsEl.innerHTML = careerStats.recentMatches.map(m => `
+    <div class="statRow highlight">
+      <span class="label" style="color:${m.result==='W'?'#4fb2ff':'#ff5158'}">${m.result} vs ${m.opponent}</span>
+      <span class="val" style="font-size:10px;">${m.method}</span>
+    </div>
+  `).join('');
+}
+
+/* ----- PREVIEW FIGHTER FACTORY ----- */
+function createPreviewFighter(charData){
+  const group = new THREE.Group();
+  const skin = 0xc79a73;
+  const mat = new THREE.MeshStandardMaterial({color:charData.color, roughness:0.5, metalness:0.15});
+  const darkMat = new THREE.MeshStandardMaterial({color:charData.dark, roughness:0.6});
+  const skinMat = new THREE.MeshStandardMaterial({color:skin, roughness:0.7});
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.75,0.36), mat);
+  torso.position.y = 1.28;
+  group.add(torso);
+
+  const hips = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,0.34), darkMat);
+  hips.position.y = 0.86;
+  group.add(hips);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22,12,12), skinMat);
+  head.position.y = 1.86;
+  group.add(head);
+
+  const shoulderL = new THREE.Group();
+  shoulderL.position.set(0.42, 1.58, 0);
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.42,0.19), skinMat);
+  armL.position.y = -0.21;
+  shoulderL.add(armL);
+  const gloveL = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), darkMat);
+  gloveL.position.y = -0.42;
+  armL.add(gloveL);
+  group.add(shoulderL);
+
+  const shoulderR = new THREE.Group();
+  shoulderR.position.set(-0.42, 1.58, 0);
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.42,0.19), skinMat);
+  armR.position.y = -0.21;
+  shoulderR.add(armR);
+  const gloveR = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), darkMat);
+  gloveR.position.y = -0.42;
+  armR.add(gloveR);
+  group.add(shoulderR);
+
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.9,0.22), darkMat);
+  legL.position.set(0.16, 0.45, 0);
+  group.add(legL);
+
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.9,0.22), darkMat);
+  legR.position.set(-0.16, 0.45, 0);
+  group.add(legR);
+
+  return group;
+}
+
+const cardGrid = document.getElementById('cardGrid');
+CHARACTERS.forEach((c,i)=>{
+  const card = document.createElement('div');
+  card.className='card';
+  card.dataset.idx=i;
+  card.innerHTML = `
+    <div class="grad" style="background:linear-gradient(160deg, #${c.color.toString(16).padStart(6,'0')}55, #0a0a0c 75%);"></div>
+    <div class="art"><div class="initial" style="color:#${c.color.toString(16).padStart(6,'0')}">${c.name[0]}</div></div>
+    <div class="cpuTag">CPU</div>
+    <div class="info">
+      <div class="name" style="color:#${c.color.toString(16).padStart(6,'0')}">${c.name}</div>
+      <div class="ov"><span>OVERALL</span><b>${c.overall}</b></div>
+    </div>`;
+  card.addEventListener('click', ()=>{
+    picks.p1 = i;
+    const pool = CHARACTERS.map((_,idx)=>idx).filter(idx=>idx!==i);
+    picks.p2 = pool[Math.floor(Math.random()*pool.length)];
+    refreshCards();
+    refreshVs();
+    updateStartBtn();
+  });
+  cardGrid.appendChild(card);
+});
+
+function refreshCards(){
+  [...cardGrid.children].forEach((el,i)=>{
+    el.classList.remove('selP1','selP2');
+    if(picks.p1===i) el.classList.add('selP1');
+    if(picks.p2===i) el.classList.add('selP2');
+  });
+}
+function refreshVs(){
+  document.getElementById('vsP1').textContent = picks.p1!==null ? CHARACTERS[picks.p1].name : '—';
+  document.getElementById('vsP2').textContent = picks.p2!==null ? CHARACTERS[picks.p2].name+' (CPU)' : 'CPU';
+}
+
+function updateStartBtn(){
+  const ok = picks.p1!==null && picks.p2!==null;
+  document.getElementById('startMatchBtn').classList.toggle('disabled', !ok);
+}
+
+document.getElementById('timeDown').addEventListener('click',()=>{
+  timeIdx = Math.max(0,timeIdx-1); updateTimeLabel();
+});
+document.getElementById('timeUp').addEventListener('click',()=>{
+  timeIdx = Math.min(timeOptions.length-1,timeIdx+1); updateTimeLabel();
+});
+function updateTimeLabel(){
+  const s=timeOptions[timeIdx];
+  const m=Math.floor(s/60), sec=s%60;
+  document.getElementById('timeVal').textContent = `${m}:${sec.toString().padStart(2,'0')}`;
+}
+updateTimeLabel();
+
+document.getElementById('entranceToggle').addEventListener('click',(e)=>{
+  entranceOn = !entranceOn;
+  e.target.classList.toggle('on', entranceOn);
+  e.target.textContent = entranceOn ? 'ON':'OFF';
+});
+
+// Initialize roster and stats on load
+initRoster();
+updateStatsUI();
+
+document.getElementById('startMatchBtn').addEventListener('click', ()=>{
+  if(picks.p1===null||picks.p2===null) return;
+  document.getElementById('menuScreen').style.display='none';
+  document.getElementById('fightScreen').style.display='block';
+  startMatch();
+});
+
+/* ----- MENU BACKGROUND PREVIEW ----- */
+let previewCharIdx = 0;
+(function previewScene(){
+  const canvas = document.getElementById('previewCanvas');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50,1,0.1,100);
+  camera.position.set(0,3.4,7.5);
+  camera.lookAt(0,1,0);
+
+  const ring = new THREE.Mesh(new THREE.BoxGeometry(6,0.3,6), new THREE.MeshStandardMaterial({color:0x151519}));
+  ring.position.y=-0.15; scene.add(ring);
+  const canvasMat = new THREE.Mesh(new THREE.BoxGeometry(5.2,0.05,5.2), new THREE.MeshStandardMaterial({color:0x1a1a3a}));
+  canvasMat.position.y=0.02; scene.add(canvasMat);
+
+  const charData = CHARACTERS[previewCharIdx];
+  const fighter = createPreviewFighter(charData);
+  fighter.position.y = 0;
+  scene.add(fighter);
+
+  const postGeo = new THREE.CylinderGeometry(0.05,0.05,2.2,8);
+  const postMat = new THREE.MeshStandardMaterial({color:0x333});
+  [[2.9,2.9],[-2.9,2.9],[2.9,-2.9],[-2.9,-2.9]].forEach(([x,z])=>{
+    const p = new THREE.Mesh(postGeo, postMat); p.position.set(x,1.1,z); scene.add(p);
+  });
+
+  const amb = new THREE.AmbientLight(0x445, 0.5); scene.add(amb);
+  const spot1 = new THREE.SpotLight(0x6688ff, 6, 20, 0.6, 0.5); spot1.position.set(-4,6,4); scene.add(spot1);
+  const spot2 = new THREE.SpotLight(0xff3355, 6, 20, 0.6, 0.5); spot2.position.set(4,6,-2); scene.add(spot2);
+
+  function resize(){
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if(w===0||h===0) return;
+    renderer.setSize(w,h,false); camera.aspect = w/h; camera.updateProjectionMatrix();
+  }
+  let t=0;
+  function loop(){
+    requestAnimationFrame(loop);
+    resize();
+    t+=0.005;
+    camera.position.x = Math.sin(t)*7.5;
+    camera.position.z = Math.cos(t)*7.5;
+    camera.lookAt(0,0.8,0);
+
+    const breathe = Math.sin(t*1.2)*0.05;
+    const sway = Math.sin(t*0.8)*0.08;
+    fighter.position.y = breathe;
+    fighter.rotation.y = sway*0.3;
+    fighter.children.forEach(limb => {
+      if(limb.rotation) limb.rotation.x = Math.sin(t*1.5)*0.1;
+    });
+
+    renderer.render(scene,camera);
+  }
+  loop();
+})();
+
+/* =========================================================================
+   FIGHT SCENE
+   ========================================================================= */
+const fightCanvas = document.getElementById('fightCanvas');
+const fRenderer = new THREE.WebGLRenderer({canvas:fightCanvas, antialias:true});
+fRenderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const fScene = new THREE.Scene();
+fScene.fog = new THREE.Fog(0x05050a, 14, 40);
+const fCamera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
+
+function resizeFight(){
+  fRenderer.setSize(innerWidth, innerHeight);
+  fCamera.aspect = innerWidth/innerHeight;
+  fCamera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resizeFight);
+resizeFight();
+
+/* lighting */
+fScene.add(new THREE.AmbientLight(0x33344a, 0.7));
+const key1 = new THREE.SpotLight(0xffffff, 3.2, 40, 0.55, 0.4); key1.position.set(-6,10,6); fScene.add(key1);
+const key2 = new THREE.SpotLight(0x88aaff, 2.4, 40, 0.55, 0.4); key2.position.set(6,10,-4); fScene.add(key2);
+const rim  = new THREE.PointLight(0xff2a34, 3, 30); rim.position.set(0,4,-10); fScene.add(rim);
+
+/* arena floor */
+const arenaFloor = new THREE.Mesh(
+  new THREE.PlaneGeometry(80,80),
+  new THREE.MeshStandardMaterial({color:0x0a0a0d, roughness:0.9})
+);
+arenaFloor.rotation.x=-Math.PI/2; fScene.add(arenaFloor);
+
+const RING_SIZE = 8;
+const ramp = new THREE.Mesh(
+  new THREE.BoxGeometry(4, 0.4, 22),
+  new THREE.MeshStandardMaterial({color:0x111116})
+);
+ramp.position.set(0, 0.2, 20);
+fScene.add(ramp);
+const rampGlowL = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.1,22), new THREE.MeshBasicMaterial({color:0xff2a34}));
+rampGlowL.position.set(-1.9,0.42,20); fScene.add(rampGlowL);
+const rampGlowR = rampGlowL.clone(); rampGlowR.position.x=1.9; fScene.add(rampGlowR);
+
+const stageBack = new THREE.Mesh(
+  new THREE.BoxGeometry(10,7,0.6),
+  new THREE.MeshStandardMaterial({color:0x0c0c10, emissive:0x1a0508, emissiveIntensity:0.6})
+);
+stageBack.position.set(0,3.5,30); fScene.add(stageBack);
+
+const crowdGeo = new THREE.SphereGeometry(0.12,4,4);
+const crowdMat = new THREE.MeshBasicMaterial({color:0x554466});
+const crowd = new THREE.InstancedMesh(crowdGeo, crowdMat, 400);
+{
+  const dummy = new THREE.Object3D();
+  let i=0;
+  for(let ring2=0; ring2<8; ring2++){
+    for(let a=0;a<50;a++){
+      const ang = (a/50)*Math.PI*2;
+      const rad = 16+ring2*1.4;
+      dummy.position.set(Math.cos(ang)*rad, 1+Math.random()*3.5, Math.sin(ang)*rad);
+      dummy.updateMatrix();
+      if(i<400){ crowd.setMatrixAt(i, dummy.matrix); i++; }
+    }
+  }
+}
+fScene.add(crowd);
+
+let arenaModel = null;
+function loadArenaModel(){
+  const loader = new THREE.FBXLoader();
+  const modelPath = encodeURI('boxing arena/boxing.fbx');
+  loader.load(modelPath, object => {
+    object.traverse(child => {
+      if(child.isMesh){
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    object.scale.setScalar(0.07);
+    object.rotation.y = Math.PI;
+    object.position.set(0, 0, 0);
+    arenaModel = object;
+    fScene.add(arenaModel);
+  }, undefined, err => {
+    console.error('Arena model load error:', err);
+    document.getElementById('errorMsg').classList.add('show');
+    document.getElementById('errorMsg').textContent = 'ERROR: Could not load boxing arena model.';
+  });
+}
+
+/* ----- FIGHTER FACTORY ----- */
+function createFighter(charData){
+  const group = new THREE.Group();
+  const skin = 0xc79a73;
+  const mat = new THREE.MeshStandardMaterial({color:charData.color, roughness:0.5, metalness:0.15});
+  const darkMat = new THREE.MeshStandardMaterial({color:charData.dark, roughness:0.6});
+  const skinMat = new THREE.MeshStandardMaterial({color:skin, roughness:0.7});
+
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.75,0.36), mat);
+  torso.position.y = 1.28;
+  group.add(torso);
+
+  const hips = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,0.34), darkMat);
+  hips.position.y = 0.86;
+  group.add(hips);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22,12,12), skinMat);
+  head.position.y = 1.86;
+  group.add(head);
+
+  function makeArm(sign){
+    const shoulder = new THREE.Group();
+    shoulder.position.set(sign*0.42, 1.58, 0);
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.42,0.19), skinMat);
+    upper.position.y = -0.21;
+    shoulder.add(upper);
+    const elbow = new THREE.Group();
+    elbow.position.y = -0.42;
+    upper.add(elbow);
+    const fore = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.4,0.17), skinMat);
+    fore.position.y=-0.2;
+    elbow.add(fore);
+    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), darkMat);
+    glove.position.y=-0.42;
+    fore.add(glove);
+    return {shoulder, elbow};
+  }
+  const rightArm = makeArm(-1);
+  const leftArm  = makeArm(1);
+  group.add(rightArm.shoulder, leftArm.shoulder);
+
+  function makeLeg(sign){
+    const hip = new THREE.Group();
+    hip.position.set(sign*0.16, 0.86, 0);
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.46,0.22), darkMat);
+    upper.position.y=-0.23;
+    hip.add(upper);
+    const knee = new THREE.Group();
+    knee.position.y=-0.46;
+    upper.add(knee);
+    const lower = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.44,0.2), skinMat);
+    lower.position.y=-0.22;
+    knee.add(lower);
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.14,0.28), darkMat);
+    boot.position.y=-0.44;
+    lower.add(boot);
+    return {hip, knee};
+  }
+  const rightLeg = makeLeg(-1);
+  const leftLeg  = makeLeg(1);
+  group.add(rightLeg.hip, leftLeg.hip);
+
+  return {
+    group, torso, head, rightArm, leftArm, rightLeg, leftLeg,
+    color:charData.color, name:charData.name,
+    hp:100, blocking:false,
+    attackAnim:null,
+    walkPhase:0,
+    facing:1,
+    pos: new THREE.Vector3(),
+    ko:false,
+  };
+}
+
+let p1F, p2F;
+
+/* ----- MATCH STATE ----- */
+let matchDuration = 120;
+let timeLeft = 120;
+let fightActive = false;
+let matchOver = false;
+let clock = new THREE.Clock();
+
+const keys = {};
+window.addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  handleAttackKey(e.code);
+});
+window.addEventListener('keyup', e=>{ keys[e.code]=false; });
+
+const P1_KEYS = {
+  forward:'KeyW', backward:'KeyD', strafeLeft:'KeyA', strafeRight:'KeyS',
+  punch:'KeyJ', heavy:'KeyK', block:'ShiftLeft', block2:'ShiftRight'
+};
+
+function handleAttackKey(code){
+  if(!fightActive || matchOver) return;
+  if(code===P1_KEYS.punch) startAttack(p1F,'light');
+  if(code===P1_KEYS.heavy) startAttack(p1F,'heavy');
+}
+
+function startAttack(f, type){
+  if(f.attackAnim || f.ko) return;
+  f.attackAnim = { type, t:0, hit:false, dur: type==='light'?0.3:0.55 };
+}
+
+/* ----- ENTRANCE SEQUENCE ----- */
+function startMatch(){
+  matchDuration = timeOptions[timeIdx];
+  timeLeft = matchDuration;
+  matchOver = false;
+  fightActive = false;
+  cpuState = { timer:0, action:'idle', attackCooldown:0.6, blockTimer:0 };
+
+  if(p1F) fScene.remove(p1F.group);
+  if(p2F) fScene.remove(p2F.group);
+
+  p1F = createFighter(CHARACTERS[picks.p1]);
+  p2F = createFighter(CHARACTERS[picks.p2]);
+  fScene.add(p1F.group, p2F.group);
+
+  document.getElementById('p1Name').textContent = p1F.name;
+  document.getElementById('p2Name').textContent = p2F.name + ' (CPU)';
+  document.getElementById('p1Pct').textContent = 100;
+  document.getElementById('p2Pct').textContent = 100;
+  document.getElementById('p1Fill').style.width='100%';
+  document.getElementById('p2Fill').style.width='100%';
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('controlsHint').classList.add('hidden');
+  document.getElementById('resultScreen').style.display='none';
+
+  p1F.group.position.set(0,0,26);
+  p2F.group.position.set(0,0,26);
+  p1F.group.visible=false;
+  p2F.group.visible=false;
+  p1F.group.rotation.y = Math.PI;
+  p2F.group.rotation.y = Math.PI;
+
+  fCamera.position.set(0,3.4,24);
+  fCamera.lookAt(0,2,20);
+
+  if(entranceOn){
+    runEntranceSequence();
+  }else{
+    placeFightersInRing();
+    beginFight();
+  }
+}
+
+function placeFightersInRing(){
+  p1F.group.visible=true;
+  p2F.group.visible=true;
+  p1F.group.position.set(-2.6,0,0);
+  p1F.group.rotation.y = Math.PI/2;
+  p2F.group.position.set(2.6,0,0);
+  p2F.group.rotation.y = -Math.PI/2;
+}
+
+const skipBtn = document.getElementById('skipHint');
+let skipRequested=false;
+skipBtn.addEventListener('click', ()=>{ skipRequested=true; });
+
+function runEntranceSequence(){
+  skipRequested=false;
+  skipBtn.classList.remove('hidden');
+  const caption = document.getElementById('entranceCaption');
+  const nowEl = caption.querySelector('.now');
+  const whoEl = caption.querySelector('.who');
+
+  function fadeEl(el, to, dur){
+    return new Promise(res=>{
+      const start = performance.now();
+      const from = parseFloat(el.style.opacity||0);
+      function step(t){
+        if(skipRequested){ el.style.opacity = to; return res(); }
+        const p = Math.min(1,(t-start)/dur);
+        el.style.opacity = from+(to-from)*p;
+        if(p<1) requestAnimationFrame(step); else res();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+  function wait(ms){
+    return new Promise(res=>{
+      const start=performance.now();
+      function step(t){
+        if(skipRequested) return res();
+        if(t-start>=ms) return res();
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  async function walkOn(fighter, label){
+    nowEl.style.opacity=0;
+    whoEl.style.opacity=0;
+    whoEl.textContent = label;
+    fighter.group.visible=true;
+    fighter.group.position.set(0,0,26);
+    fighter.group.rotation.y = Math.PI;
+
+    await fadeEl(nowEl,1,350);
+    await fadeEl(whoEl,1,400);
+
+    const startZ = 26, endZ = 5.2;
+    const camStartZ = 24, camEndZ = 9;
+    const dur = 3200;
+    const t0 = performance.now();
+    await new Promise(res=>{
+      function step(t){
+        const p = Math.min(1,(t-t0)/dur);
+        const ease = 1-Math.pow(1-p,2);
+        if(!skipRequested){
+          fighter.group.position.z = startZ + (endZ-startZ)*ease;
+          fighter.walkPhase += 0.25;
+          animateWalkCycle(fighter);
+          fCamera.position.set(Math.sin(p*3)*0.6, 3.2, camStartZ+(camEndZ-camStartZ)*ease);
+          fCamera.lookAt(0,1.6, fighter.group.position.z-2);
+        }
+        if(p<1 && !skipRequested) requestAnimationFrame(step);
+        else res();
+      }
+      requestAnimationFrame(step);
+    });
+    fighter.group.position.z = endZ;
+
+    await fadeEl(whoEl,0,300);
+    await fadeEl(nowEl,0,200);
+  }
+
+  (async ()=>{
+    await walkOn(p1F, p1F.name);
+    if(!skipRequested) await wait(200);
+    p1F.group.visible = false;
+    await walkOn(p2F, p2F.name+' (CPU)');
+    p2F.group.visible = false;
+
+    skipBtn.classList.add('hidden');
+    placeFightersInRing();
+
+    const camFrom = fCamera.position.clone();
+    const camTo = new THREE.Vector3(0,3.6,9.5);
+    const t0 = performance.now();
+    await new Promise(res=>{
+      function step(t){
+        const p = Math.min(1,(t-t0)/900);
+        fCamera.position.lerpVectors(camFrom,camTo,p);
+        fCamera.lookAt(0,1.4,0);
+        if(p<1) requestAnimationFrame(step); else res();
+      }
+      requestAnimationFrame(step);
+    });
+
+    beginFight();
+  })();
+}
+
+function animateWalkCycle(f){
+  const s = Math.sin(f.walkPhase)*0.5;
+  f.leftLeg.hip.rotation.x = s;
+  f.rightLeg.hip.rotation.x = -s;
+  f.leftArm.shoulder.rotation.x = -s*0.6;
+  f.rightArm.shoulder.rotation.x = s*0.6;
+}
+
+function showBigText(text, ms){
+  const el = document.getElementById('bigText');
+  el.textContent = text;
+  el.style.transition='none';
+  el.style.opacity=0;
+  el.style.transform='scale(.7)';
+  requestAnimationFrame(()=>{
+    el.style.transition='opacity .25s ease, transform .25s ease';
+    el.style.opacity=1;
+    el.style.transform='scale(1)';
+  });
+  setTimeout(()=>{
+    el.style.transition='opacity .4s ease';
+    el.style.opacity=0;
+  }, ms);
+}
+
+function beginFight(){
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('controlsHint').classList.remove('hidden');
+  fCamera.position.set(0,3.6,9.5);
+  fCamera.lookAt(0,1.4,0);
+  showBigText('FIGHT!',1200);
+  fightActive = true;
+  clock.getDelta();
+}
+
+/* ----- MAIN FIGHT UPDATE ----- */
+const BOUND = RING_SIZE/2 - 0.9;
+const MOVE_SPEED = 3.4;
+
+function updatePlayerControls(f, opponent, K, dt){
+  if(f.ko) return false;
+
+  const toOpp = new THREE.Vector3().subVectors(opponent.group.position, f.group.position);
+  toOpp.y = 0;
+  if(toOpp.lengthSq() > 0.0001) toOpp.normalize();
+  const rightVec = new THREE.Vector3(toOpp.z, 0, -toOpp.x);
+
+  const moveVec = new THREE.Vector3();
+  if(keys[K.forward]) moveVec.add(toOpp);
+  if(keys[K.backward]) moveVec.sub(toOpp);
+  if(keys[K.strafeRight]) moveVec.add(rightVec);
+  if(keys[K.strafeLeft]) moveVec.sub(rightVec);
+
+  let moving = false;
+  if(moveVec.lengthSq() > 0.0001){
+    moveVec.normalize();
+    f.group.position.x += moveVec.x*MOVE_SPEED*dt;
+    f.group.position.z += moveVec.z*MOVE_SPEED*dt;
+    f.group.position.x = THREE.MathUtils.clamp(f.group.position.x,-BOUND,BOUND);
+    f.group.position.z = THREE.MathUtils.clamp(f.group.position.z,-BOUND,BOUND);
+    f.walkPhase += dt*8;
+    moving = true;
+  }
+  f.blocking = !!(keys[K.block] || (K.block2 && keys[K.block2]));
+  return moving;
+}
+
+let cpuState = { timer:0, action:'idle', attackCooldown:0.6, blockTimer:0 };
+
+function updateCPU(cpu, player, dt){
+  if(cpu.ko) return false;
+  cpuState.timer -= dt;
+  cpuState.attackCooldown -= dt;
+  cpuState.blockTimer -= dt;
+
+  const toPlayer = new THREE.Vector3().subVectors(player.group.position, cpu.group.position);
+  toPlayer.y = 0;
+  const dist = toPlayer.length();
+  if(dist > 0.0001) toPlayer.normalize();
+  const rightVec = new THREE.Vector3(toPlayer.z, 0, -toPlayer.x);
+
+  if(cpuState.timer <= 0){
+    const r = Math.random();
+    if(dist > 2.3) cpuState.action = 'approach';
+    else if(dist < 0.85) cpuState.action = 'retreat';
+    else if(r < 0.32) cpuState.action = 'circleLeft';
+    else if(r < 0.64) cpuState.action = 'circleRight';
+    else if(r < 0.82) cpuState.action = 'approach';
+    else cpuState.action = 'idle';
+    cpuState.timer = 0.5 + Math.random()*0.9;
+  }
+
+  const moveVec = new THREE.Vector3();
+  switch(cpuState.action){
+    case 'approach': moveVec.add(toPlayer); break;
+    case 'retreat': moveVec.sub(toPlayer); break;
+    case 'circleLeft': moveVec.sub(rightVec); break;
+    case 'circleRight': moveVec.add(rightVec); break;
+  }
+
+  let moving = false;
+  if(moveVec.lengthSq() > 0.0001 && !cpu.attackAnim){
+    moveVec.normalize();
+    cpu.group.position.x += moveVec.x*MOVE_SPEED*0.82*dt;
+    cpu.group.position.z += moveVec.z*MOVE_SPEED*0.82*dt;
+    cpu.group.position.x = THREE.MathUtils.clamp(cpu.group.position.x,-BOUND,BOUND);
+    cpu.group.position.z = THREE.MathUtils.clamp(cpu.group.position.z,-BOUND,BOUND);
+    cpu.walkPhase += dt*8;
+    moving = true;
+  }
+
+  if(player.attackAnim && dist < 1.9 && cpuState.blockTimer <= 0 && Math.random() < 0.035){
+    cpu.blocking = true;
+    cpuState.blockTimer = 0.35 + Math.random()*0.5;
+  }else if(cpuState.blockTimer <= 0){
+    cpu.blocking = false;
+  }
+
+  if(dist < 1.7 && cpuState.attackCooldown <= 0 && !cpu.attackAnim){
+    const type = Math.random() < 0.72 ? 'light' : 'heavy';
+    startAttack(cpu, type);
+    cpuState.attackCooldown = type==='heavy' ? (1.1+Math.random()*0.8) : (0.55+Math.random()*0.55);
+  }
+
+  return moving;
+}
+
+function updateAttackAnim(f, opponent, dt){
+  const anim = f.attackAnim;
+  if(!anim) return;
+  anim.t += dt;
+  const p = Math.min(1, anim.t/anim.dur);
+  const swing = Math.sin(p*Math.PI);
+
+  if(anim.type==='light'){
+    f.rightArm.shoulder.rotation.x = -swing*2.1;
+    f.rightArm.elbow.rotation.x = -swing*0.5;
+  } else {
+    f.leftArm.shoulder.rotation.x = -swing*2.6;
+    f.leftArm.elbow.rotation.x = -swing*0.7;
+    f.torso.rotation.y = -f.facing*swing*0.35;
+  }
+
+  const hitWindowStart = anim.type==='light' ? 0.4 : 0.48;
+  const hitWindowEnd   = anim.type==='light' ? 0.6 : 0.68;
+  if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
+    const dist = f.group.position.distanceTo(opponent.group.position);
+    const range = anim.type==='light' ? 1.45 : 1.75;
+    if(dist < range){
+      anim.hit = true;
+      let dmg = anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8);
+      if(opponent.blocking) dmg *= 0.22;
+      opponent.hp = Math.max(0, opponent.hp - dmg);
+      flashHit(opponent);
+      updateHpUI();
+      if(opponent.hp<=0 && !matchOver){
+        triggerKO(opponent, f);
+      }
+    }
+  }
+
+  if(p>=1){
+    f.attackAnim = null;
+    f.rightArm.shoulder.rotation.x = 0;
+    f.rightArm.elbow.rotation.x = 0;
+    f.leftArm.shoulder.rotation.x = 0;
+    f.leftArm.elbow.rotation.x = 0;
+    f.torso.rotation.y = 0;
+  }
+}
+
+function flashHit(f){
+  const mats = [];
+  f.group.traverse(o=>{ if(o.isMesh) mats.push(o.material); });
+  mats.forEach(m=>{ if(m.emissive!==undefined){ m.emissive = new THREE.Color(0xff2222); m.emissiveIntensity=0.9; }});
+  setTimeout(()=>{
+    mats.forEach(m=>{ if(m.emissive!==undefined){ m.emissiveIntensity=0; }});
+  },120);
+  const dir = new THREE.Vector3().subVectors(f.group.position, (f===p1F?p2F:p1F).group.position).normalize();
+  f.group.position.addScaledVector(dir, 0.12);
+  f.group.position.x = THREE.MathUtils.clamp(f.group.position.x,-BOUND,BOUND);
+  f.group.position.z = THREE.MathUtils.clamp(f.group.position.z,-BOUND,BOUND);
+}
+
+function updateHpUI(){
+  document.getElementById('p1Pct').textContent = Math.ceil(p1F.hp);
+  document.getElementById('p2Pct').textContent = Math.ceil(p2F.hp);
+  document.getElementById('p1Fill').style.width = p1F.hp+'%';
+  document.getElementById('p2Fill').style.width = p2F.hp+'%';
+}
+
+function facePlayers(){
+  const dx = p2F.group.position.x - p1F.group.position.x;
+  const dz = p2F.group.position.z - p1F.group.position.z;
+  const angle = Math.atan2(dx,dz);
+  p1F.group.rotation.y = angle;
+  p2F.group.rotation.y = angle + Math.PI;
+}
+
+function updateWalkPose(f, moving){
+  if(f.attackAnim) return;
+  if(moving){
+    animateWalkCycle(f);
+  }else{
+    f.leftLeg.hip.rotation.x = THREE.MathUtils.lerp(f.leftLeg.hip.rotation.x,0,0.2);
+    f.rightLeg.hip.rotation.x = THREE.MathUtils.lerp(f.rightLeg.hip.rotation.x,0,0.2);
+  }
+  f.leftArm.shoulder.rotation.x = THREE.MathUtils.lerp(f.leftArm.shoulder.rotation.x, f.blocking?-1.4:0, 0.25);
+  f.rightArm.shoulder.rotation.x = THREE.MathUtils.lerp(f.rightArm.shoulder.rotation.x, f.blocking?-1.4:0, 0.25);
+}
+
+function triggerKO(loser, winner){
+  matchOver = true;
+  fightActive = false;
+  loser.ko = true;
+  updateCareerStats(winner, loser, true);
+  showBigText('KNOCKOUT!',1600);
+  const winnerLabel = winner===p1F ? p1F.name : p2F.name+' (CPU)';
+  const subLabel = winner===p1F ? 'WINNER BY KNOCKOUT' : 'CPU WINS BY KNOCKOUT';
+  setTimeout(()=> showResult(winnerLabel, subLabel), 1400);
+}
+
+function endByDecision(){
+  matchOver = true;
+  fightActive = false;
+  let winner;
+  if(p1F.hp>p2F.hp) winner=p1F;
+  else if(p2F.hp>p1F.hp) winner=p2F;
+  else winner=null;
+  
+  if(winner) updateCareerStats(winner, winner===p1F?p2F:p1F, false);
+  
+  showBigText("TIME'S UP",1200);
+  setTimeout(()=>{
+    if(winner===p1F) showResult(p1F.name, "WINNER BY REFEREE'S DECISION");
+    else if(winner===p2F) showResult(p2F.name+' (CPU)', "CPU WINS BY REFEREE'S DECISION");
+    else showResult('DRAW', 'NO DECISION — SPLIT RESULT');
+  },1100);
+}
+
+function showResult(winnerName, sub){
+  document.getElementById('resultTitle').textContent = winnerName==='DRAW' ? 'DRAW' : 'VICTORY';
+  document.getElementById('resultSub').textContent = sub;
+  document.getElementById('resultWinner').textContent = winnerName==='DRAW' ? '' : winnerName;
+  document.getElementById('resultScreen').style.display='flex';
+}
+
+document.getElementById('rematchBtn').addEventListener('click', ()=>{
+  document.getElementById('resultScreen').style.display='none';
+  startMatch();
+});
+document.getElementById('mainMenuBtn').addEventListener('click', ()=>{
+  document.getElementById('resultScreen').style.display='none';
+  document.getElementById('fightScreen').style.display='none';
+  document.getElementById('menuScreen').style.display='grid';
+});
+
+/* ----- RENDER LOOP ----- */
+let isRunning = false;
+
+function fightLoop(){
+  if(!isRunning) {
+    isRunning = true;
+    requestAnimationFrame(fightLoop);
+    return;
+  }
+  
+  requestAnimationFrame(fightLoop);
+  const dt = Math.min(0.05, clock.getDelta());
+
+  if(fightActive && !matchOver){
+    const m1 = updatePlayerControls(p1F, p2F, P1_KEYS, dt);
+    const m2 = updateCPU(p2F, p1F, dt);
+
+    const minDist = 1.1;
+    const dvec = new THREE.Vector3().subVectors(p1F.group.position, p2F.group.position);
+    const d = dvec.length();
+    if(d < minDist && d>0.0001){
+      const push = dvec.multiplyScalar((minDist-d)/2/d);
+      p1F.group.position.add(push);
+      p2F.group.position.sub(push);
+    }
+
+    facePlayers();
+    updateWalkPose(p1F, m1);
+    updateWalkPose(p2F, m2);
+    updateAttackAnim(p1F, p2F, dt);
+    updateAttackAnim(p2F, p1F, dt);
+
+    timeLeft -= dt;
+    if(timeLeft<=0){
+      timeLeft=0;
+      endByDecision();
+    }
+    const mm = Math.floor(timeLeft/60), ss = Math.floor(timeLeft%60);
+    document.getElementById('clock').textContent = `${mm}:${ss.toString().padStart(2,'0')}`;
+  }
+
+  fRenderer.render(fScene, fCamera);
+}
+
+loadArenaModel();
+fightLoop();
+
+} // end initializeGame function
+</script>
+
+</body>
+</html>
