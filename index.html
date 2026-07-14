@@ -318,6 +318,41 @@
               <span class="val" id="stat-lastResult">—</span>
             </div>
           </div>
+            <div class="pageTitle" style="margin-top:12px;">SKILL POINTS & UPGRADES</div>
+            <div id="upgradesPanel" style="padding:8px;">
+              <div class="statRow">
+                <span class="label">PLAYER SKILL POINTS</span>
+                <span class="val" id="playerSkillPts">0</span>
+              </div>
+              <div class="statRow">
+                <span class="label">CPU SKILL POINTS</span>
+                <span class="val" id="cpuSkillPts">0</span>
+              </div>
+              <div style="margin-top:8px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Health</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_hp">-</button> <span id="player_hp" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_hp">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(+10 HP /pt)</span> </div>
+              </div>
+              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Stamina</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_stam">-</button> <span id="player_stam" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_stam">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(faster recovery)</span> </div>
+              </div>
+              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Energy</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_energy">-</button> <span id="player_energy" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_energy">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(improves block)</span> </div>
+              </div>
+              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Damage</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_dmg">-</button> <span id="player_dmg" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_dmg">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(+8% damage /pt)</span> </div>
+              </div>
+              <div style="margin-top:8px; display:flex; gap:8px;">
+                <div class="resultBtn" id="resetUpgrades">RESET</div>
+                <div style="flex:1"></div>
+              </div>
+            </div>
 
           <!-- CAREER Page -->
           <div id="page-career" class="backstagePage">
@@ -634,6 +669,67 @@ let careerStats = {
   recentMatches: []
 };
 
+/* ----- SKILL POINTS / UPGRADES ----- */
+let playerSkillPts = 0;
+let cpuSkillPts = 0;
+const playerUpgrades = { hp:0, stamina:0, energy:0, damage:0 };
+const cpuUpgrades = { hp:0, stamina:0, energy:0, damage:0 };
+
+function loadUpgrades(){
+  try{
+    const s = localStorage.getItem('boxing_upgrades');
+    if(s){
+      const obj = JSON.parse(s);
+      Object.assign(playerUpgrades, obj.playerUpgrades||{});
+      Object.assign(cpuUpgrades, obj.cpuUpgrades||{});
+      playerSkillPts = obj.playerSkillPts||0;
+      cpuSkillPts = obj.cpuSkillPts||0;
+    }
+  }catch(e){}
+}
+function saveUpgrades(){
+  try{ localStorage.setItem('boxing_upgrades', JSON.stringify({ playerUpgrades, cpuUpgrades, playerSkillPts, cpuSkillPts })); }catch(e){}
+}
+
+function updateUpgradesUI(){
+  document.getElementById('playerSkillPts').textContent = playerSkillPts;
+  document.getElementById('cpuSkillPts').textContent = cpuSkillPts;
+  document.getElementById('player_hp').textContent = playerUpgrades.hp;
+  document.getElementById('player_stam').textContent = playerUpgrades.stamina;
+  document.getElementById('player_energy').textContent = playerUpgrades.energy;
+  document.getElementById('player_dmg').textContent = playerUpgrades.damage;
+}
+
+function allocateUpgrade(target, stat, delta){
+  const up = target==='player' ? playerUpgrades : cpuUpgrades;
+  const pts = target==='player' ? () => playerSkillPts : () => cpuSkillPts;
+  if(delta>0){
+    if((target==='player'?playerSkillPts:cpuSkillPts) <= 0) return;
+    up[stat] = (up[stat]||0) + delta;
+    if(target==='player') playerSkillPts -= delta; else cpuSkillPts -= delta;
+  }else{
+    if((up[stat]||0) <= 0) return;
+    up[stat] = Math.max(0, up[stat] + delta);
+    if(target==='player') playerSkillPts -= delta; else cpuSkillPts -= delta; // delta is negative -> add back
+  }
+  saveUpgrades(); updateUpgradesUI();
+}
+
+function autoAllocateCpu(){
+  // simple even distribution across stats when cpu gains points
+  const order = ['hp','damage','stamina','energy'];
+  while(cpuSkillPts>0){
+    for(const s of order){
+      if(cpuSkillPts<=0) break;
+      cpuUpgrades[s] = (cpuUpgrades[s]||0)+1;
+      cpuSkillPts--;
+    }
+  }
+  saveUpgrades(); updateUpgradesUI();
+}
+
+loadUpgrades();
+
 /* ----- MENU PAGE SWITCHER ----- */
 const menuItems = document.querySelectorAll('#mainMenuList li');
 const backstagePages = document.querySelectorAll('.backstagePage');
@@ -678,10 +774,15 @@ function updateCareerStats(winner, loser, isKO){
     careerStats.currentStreak++;
     if(isKO) careerStats.totalKOs++;
     careerStats.lastResult = 'WIN';
+    // award skill points to player
+    playerSkillPts += 5;
   } else {
     careerStats.losses++;
     careerStats.currentStreak = 0;
     careerStats.lastResult = 'LOSS';
+    // award skill points to CPU and auto allocate
+    cpuSkillPts += 5;
+    autoAllocateCpu();
   }
   
   careerStats.recentMatches.unshift({
@@ -693,6 +794,7 @@ function updateCareerStats(winner, loser, isKO){
   if(careerStats.recentMatches.length > 5) careerStats.recentMatches.pop();
 
   updateStatsUI();
+  updateUpgradesUI();
 }
 
 function updateStatsUI(){
@@ -829,6 +931,22 @@ document.getElementById('entranceToggle').addEventListener('click',(e)=>{
 // Initialize roster and stats on load
 initRoster();
 updateStatsUI();
+ updateUpgradesUI();
+
+// Upgrade button handlers
+document.getElementById('inc_hp').addEventListener('click', ()=> allocateUpgrade('player','hp',1));
+document.getElementById('dec_hp').addEventListener('click', ()=> allocateUpgrade('player','hp',-1));
+document.getElementById('inc_stam').addEventListener('click', ()=> allocateUpgrade('player','stamina',1));
+document.getElementById('dec_stam').addEventListener('click', ()=> allocateUpgrade('player','stamina',-1));
+document.getElementById('inc_energy').addEventListener('click', ()=> allocateUpgrade('player','energy',1));
+document.getElementById('dec_energy').addEventListener('click', ()=> allocateUpgrade('player','energy',-1));
+document.getElementById('inc_dmg').addEventListener('click', ()=> allocateUpgrade('player','damage',1));
+document.getElementById('dec_dmg').addEventListener('click', ()=> allocateUpgrade('player','damage',-1));
+document.getElementById('resetUpgrades').addEventListener('click', ()=>{
+  playerSkillPts += (playerUpgrades.hp + playerUpgrades.stamina + playerUpgrades.energy + playerUpgrades.damage);
+  playerUpgrades.hp = playerUpgrades.stamina = playerUpgrades.energy = playerUpgrades.damage = 0;
+  saveUpgrades(); updateUpgradesUI(); updateStatsUI();
+});
 
 document.getElementById('startMatchBtn').addEventListener('click', ()=>{
   if(picks.p1===null||picks.p2===null) return;
@@ -984,7 +1102,7 @@ function loadArenaModel(){
 }
 
 /* ----- FIGHTER FACTORY ----- */
-function createFighter(charData){
+function createFighter(charData, side){
   const group = new THREE.Group();
   const skin = 0xc79a73;
   const mat = new THREE.MeshStandardMaterial({color:charData.color, roughness:0.5, metalness:0.15});
@@ -1045,10 +1163,18 @@ function createFighter(charData){
   const leftLeg  = makeLeg(1);
   group.add(rightLeg.hip, leftLeg.hip);
 
+  const up = (side==='player') ? playerUpgrades : cpuUpgrades;
+  const maxHp = 100 + (up.hp||0) * 10;
+  const damageMul = 1 + (up.damage||0) * 0.08;
+  const stamina = (up.stamina||0) * 0.12; // affects attack speed / cooldown
+  const energy = (up.energy||0) * 0.12;   // affects block effectiveness
+  const blockReduction = Math.max(0.08, 0.22 - (up.energy||0) * 0.03);
+
   return {
     group, torso, head, rightArm, leftArm, rightLeg, leftLeg,
     color:charData.color, name:charData.name,
-    hp:100, blocking:false,
+    maxHp: maxHp, hp: maxHp, blocking:false,
+    damageMul: damageMul, stamina: stamina, energy: energy, blockReduction: blockReduction,
     attackAnim:null,
     walkPhase:0,
     facing:1,
@@ -1086,7 +1212,9 @@ function handleAttackKey(code){
 
 function startAttack(f, type){
   if(f.attackAnim || f.ko) return;
-  f.attackAnim = { type, t:0, hit:false, dur: type==='light'?0.3:0.55 };
+  const baseDur = type==='light'?0.3:0.55;
+  const dur = baseDur * Math.max(0.6, 1 - (f.stamina||0)*0.45);
+  f.attackAnim = { type, t:0, hit:false, dur };
 }
 
 /* ----- ENTRANCE SEQUENCE ----- */
@@ -1101,16 +1229,16 @@ function startMatch(){
   if(p1F) fScene.remove(p1F.group);
   if(p2F) fScene.remove(p2F.group);
 
-  p1F = createFighter(CHARACTERS[picks.p1]);
-  p2F = createFighter(CHARACTERS[picks.p2]);
+  p1F = createFighter(CHARACTERS[picks.p1], 'player');
+  p2F = createFighter(CHARACTERS[picks.p2], 'cpu');
   fScene.add(p1F.group, p2F.group);
 
   document.getElementById('p1Name').textContent = p1F.name;
   document.getElementById('p2Name').textContent = p2F.name + ' (CPU)';
-  document.getElementById('p1Pct').textContent = 100;
-  document.getElementById('p2Pct').textContent = 100;
-  document.getElementById('p1Fill').style.width='100%';
-  document.getElementById('p2Fill').style.width='100%';
+  document.getElementById('p1Pct').textContent = Math.ceil(p1F.hp);
+  document.getElementById('p2Pct').textContent = Math.ceil(p2F.hp);
+  document.getElementById('p1Fill').style.width = Math.min(100, Math.round((p1F.hp / p1F.maxHp)*100)) + '%';
+  document.getElementById('p2Fill').style.width = Math.min(100, Math.round((p2F.hp / p2F.maxHp)*100)) + '%';
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('controlsHint').classList.add('hidden');
   document.getElementById('resultScreen').style.display='none';
@@ -1368,7 +1496,9 @@ function updateCPU(cpu, player, dt){
   if(dist < 1.7 && cpuState.attackCooldown <= 0 && !cpu.attackAnim){
     const type = Math.random() < 0.72 ? 'light' : 'heavy';
     startAttack(cpu, type);
-    cpuState.attackCooldown = type==='heavy' ? (1.1+Math.random()*0.8) : (0.55+Math.random()*0.55);
+    const baseCd = type==='heavy' ? (1.1+Math.random()*0.8) : (0.55+Math.random()*0.55);
+    const mod = Math.max(0.5, 1 - (cpu.stamina||0) * 0.06);
+    cpuState.attackCooldown = baseCd * mod;
   }
 
   return moving;
@@ -1392,13 +1522,14 @@ function updateAttackAnim(f, opponent, dt){
 
   const hitWindowStart = anim.type==='light' ? 0.4 : 0.48;
   const hitWindowEnd   = anim.type==='light' ? 0.6 : 0.68;
-  if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
+    if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
     const dist = f.group.position.distanceTo(opponent.group.position);
     const range = anim.type==='light' ? 1.45 : 1.75;
     if(dist < range){
       anim.hit = true;
-      let dmg = anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8);
-      if(opponent.blocking) dmg *= 0.22;
+      let dmgBase = anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8);
+      let dmg = dmgBase * (f.damageMul||1);
+      if(opponent.blocking) dmg *= (opponent.blockReduction||0.22);
       opponent.hp = Math.max(0, opponent.hp - dmg);
       flashHit(opponent);
       updateHpUI();
@@ -1434,8 +1565,10 @@ function flashHit(f){
 function updateHpUI(){
   document.getElementById('p1Pct').textContent = Math.ceil(p1F.hp);
   document.getElementById('p2Pct').textContent = Math.ceil(p2F.hp);
-  document.getElementById('p1Fill').style.width = p1F.hp+'%';
-  document.getElementById('p2Fill').style.width = p2F.hp+'%';
+  const p1pct = Math.max(0, Math.min(100, (p1F.hp / (p1F.maxHp||100)) * 100));
+  const p2pct = Math.max(0, Math.min(100, (p2F.hp / (p2F.maxHp||100)) * 100));
+  document.getElementById('p1Fill').style.width = p1pct + '%';
+  document.getElementById('p2Fill').style.width = p2pct + '%';
 }
 
 function facePlayers(){
