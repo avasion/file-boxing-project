@@ -291,6 +291,24 @@
   #entranceCaption .now{ font-size:14px; letter-spacing:6px; color:var(--gold); opacity:0;}
   #entranceCaption .who{ font-size:64px; font-family:'Bebas Neue'; letter-spacing:4px; color:#fff; opacity:0; text-shadow:0 0 20px rgba(0,0,0,.9);}
 
+  /* Explore mode: prompt sits low so it never fights the ring for attention, and stays
+     click-through so the canvas keeps receiving the click that grabs pointer lock. */
+  #exploreHint{
+    position:absolute; bottom:8%; left:0; right:0; text-align:center; z-index:7;
+    pointer-events:none; text-shadow:0 2px 6px #000;
+  }
+  #exploreHint #exploreLine1{
+    font-family:'Bebas Neue'; font-size:26px; letter-spacing:5px; color:#fff; margin-bottom:6px;
+  }
+  #exploreHint #exploreLine2{ font-size:11px; letter-spacing:2px; color:#9a958a; }
+  #exploreHint #exploreLine3{
+    margin-top:10px; font-size:12px; letter-spacing:3px; color:var(--gold);
+  }
+  #exploreCrosshair{
+    position:absolute; top:50%; left:50%; width:6px; height:6px; margin:-3px 0 0 -3px;
+    background:#efe9d8; opacity:.55; box-shadow:1px 1px 0 #000; z-index:7; pointer-events:none;
+  }
+
   #skipHint{
     position:absolute; top:16px; right:20px; font-size:11px; letter-spacing:2px; color:#888;
     border:1px solid #333; padding:6px 10px; cursor:pointer; z-index:7; background:rgba(0,0,0,0.4);
@@ -517,6 +535,10 @@
         <span class="label">ENTRANCE</span>
         <span class="val"><span class="toggleChip on" id="entranceToggle">ON</span></span>
       </div>
+      <div class="setupRow">
+        <span class="label">EXPLORE FIRST</span>
+        <span class="val"><span class="toggleChip on" id="exploreToggle">ON</span></span>
+      </div>
       <div class="setupRow" style="border-bottom:none;">
         <span class="label">CONTROLS</span>
         <span class="val" id="setupControls" style="font-size:11px; color:var(--muted); text-align:right; display:block;">MOVE&#58; WASD<br>JAB&#58; J&#8195;POWER PUNCH&#58; K&#8195;BLOCK&#58; SHIFT</span>
@@ -542,6 +564,13 @@
     <canvas id="fightCanvas"></canvas>
 
     <div id="skipHint" class="hidden">SKIP ENTRANCE &#9658;</div>
+
+    <div id="exploreHint" class="hidden">
+      <div id="exploreLine1">CLICK TO LOOK AROUND</div>
+      <div id="exploreLine2">WASD&#8195;WALK&#8195;&#183;&#8195;SHIFT&#8195;RUN&#8195;&#183;&#8195;O&#8195;OVERVIEW&#8195;&#183;&#8195;ESC&#8195;RELEASE CURSOR</div>
+      <div id="exploreLine3">ENTER&#8195;START THE MATCH</div>
+    </div>
+    <div id="exploreCrosshair" class="hidden"></div>
 
     <div id="entranceCaption">
       <div class="now display">NOW ENTERING</div>
@@ -661,11 +690,13 @@ window.AUDIO = (function(){
 <script type="module">
 (async () => {
   try {
-    const [THREE, gym, ring, stands] = await Promise.all([
+    const [THREE, gym, ring, stands, plc, oc] = await Promise.all([
       import('three'),
       import('./src/arena/gym.js'),
       import('./src/arena/ring.js'),
       import('./src/arena/stands.js'),
+      import('three/addons/controls/PointerLockControls.js'),
+      import('three/addons/controls/OrbitControls.js'),
     ]);
     window.THREE = THREE;
     window.ARENA = {
@@ -673,6 +704,10 @@ window.AUDIO = (function(){
       buildRing: ring.buildRing,
       buildStands: stands.buildStands,
       RING: ring.RING,
+      GYM: gym.GYM,
+      standHeightAt: stands.standHeightAt,
+      PointerLockControls: plc.PointerLockControls,
+      OrbitControls: oc.OrbitControls,
     };
     document.getElementById('loadingMsg').classList.remove('show');
     initializeGame();
@@ -709,6 +744,7 @@ let picks = { p1:null, p2:null };
 let timeOptions = [60,90,120,180,300];
 let timeIdx = timeOptions.indexOf(120);
 let entranceOn = true;
+let exploreOn = true;
 
 /* ----- CAREER STATS ----- */
 let careerStats = {
@@ -1141,6 +1177,12 @@ document.getElementById('entranceToggle').addEventListener('click',(e)=>{
   e.target.textContent = entranceOn ? 'ON':'OFF';
 });
 
+document.getElementById('exploreToggle').addEventListener('click',(e)=>{
+  exploreOn = !exploreOn;
+  e.target.classList.toggle('on', exploreOn);
+  e.target.textContent = exploreOn ? 'ON':'OFF';
+});
+
 // Initialize roster and stats on load
 initRoster();
 updateStatsUI();
@@ -1270,6 +1312,13 @@ const RING_SIZE = 8;
  * call scene.add(), so a Group stands in for the scene and lets the arena be transformed as one
  * without editing the copied modules. */
 let arenaModel = null;
+let ARENA_SCALE = 1;
+
+/* The arena is scaled by ARENA_SCALE and spun 180 degrees about Y, so world x/z are the arena's
+ * negated and scaled. Everything the arena exports (RING, GYM, standHeightAt) is in arena units,
+ * so explore-mode collision converts into that space rather than duplicating the numbers here. */
+function worldToArena(wx, wz){ return { x: -wx / ARENA_SCALE, z: -wz / ARENA_SCALE }; }
+function arenaToWorldY(ay){ return ay * ARENA_SCALE; }
 
 function buildArena(){
   const { buildGym, buildRing, buildStands, RING } = window.ARENA;
@@ -1277,7 +1326,8 @@ function buildArena(){
   buildGym(arena);
   buildRing(arena);
   buildStands(arena);
-  arena.scale.setScalar((RING_SIZE / 2) / RING.ropeHalf);
+  ARENA_SCALE = (RING_SIZE / 2) / RING.ropeHalf;
+  arena.scale.setScalar(ARENA_SCALE);
   arena.rotation.y = Math.PI;
   arenaModel = arena;
   fScene.add(arena);
@@ -1295,6 +1345,173 @@ function entranceGroundY(z){ return 0; }
  * the ring apron at z=5.1. The runway itself is only ~3.1 units tall once scaled and the entrance
  * camera rides at y=3.2, so the walk is staged in the gym rather than back inside the tunnel. */
 const ENTRANCE_START_Z = 14;
+
+/* =========================================================================
+   EXPLORE MODE — walk the arena before the bell
+   FPS walk with pointer lock, or an overview orbit. Both drive fCamera and are
+   only live while no fight is running, so nothing here touches match logic.
+   The ground/​walkable rules mirror the arena's own: the ring is reachable only
+   up the corner steps, the stands are a ledge, and the walls are solid.
+   ========================================================================= */
+const EXPLORE = {
+  eyeArena: 14,        // arena units, as authored
+  walkArena: 36,       // arena units/sec
+  runArena: 64,
+  climbArena: 2.6,     // tallest step-up allowed in one move
+};
+
+let viewMode = 'fight';        // 'fight' | 'fps' | 'orbit'
+let fpsControls = null, orbitControls = null;
+let exploreY = 0;              // smoothed ground height, world units
+const _exDir = new THREE.Vector3();
+
+/* Ground height in ARENA units at an arena x/z — ported from the arena's own walk model. */
+function groundAtArena(ax, az){
+  const { RING, standHeightAt } = window.ARENA;
+  const s = RING.steps;
+  if(ax >= s.x0 && ax <= s.x1 && az >= s.zOuter && az <= s.zInner){
+    const t = (az - s.zOuter) / (s.zInner - s.zOuter);
+    return RING.top * t;                       // the corner steps ramp up to the canvas
+  }
+  if(Math.abs(ax) <= RING.half && Math.abs(az) <= RING.half) return RING.top;
+  return standHeightAt(ax, az);                // stands are a ledge, not a staircase
+}
+
+function inWalkableArena(ax, az){
+  const { GYM } = window.ARENA;
+  const m = 5, t = GYM.tunnel;
+  const inGym = ax > GYM.x0 + m && ax < GYM.x1 - m && az > GYM.z0 + m && az < GYM.z1 - m;
+  const inRunway = ax > t.x0 + 2 && ax < t.x1 - 2 && az > GYM.z0 - t.depth + 4 && az <= GYM.z0 + m;
+  return inGym || inRunway;
+}
+
+function exploreGroundY(wx, wz){
+  const a = worldToArena(wx, wz);
+  return arenaToWorldY(groundAtArena(a.x, a.z));
+}
+function exploreWalkable(wx, wz){
+  const a = worldToArena(wx, wz);
+  return inWalkableArena(a.x, a.z);
+}
+
+function ensureExploreControls(){
+  const { PointerLockControls, OrbitControls } = window.ARENA;
+  if(!fpsControls){
+    fpsControls = new PointerLockControls(fCamera, fightCanvas);
+    fpsControls.addEventListener('lock',   () => updateExploreHint());
+    fpsControls.addEventListener('unlock', () => updateExploreHint());
+    // Clicking the canvas grabs the mouse, but only while walking -- orbit needs the free cursor
+    // to drag with, and a fight must never swallow the pointer.
+    fightCanvas.addEventListener('click', () => {
+      if(viewMode === 'fps' && !fpsControls.isLocked) fpsControls.lock();
+    });
+  }
+  if(!orbitControls){
+    orbitControls = new OrbitControls(fCamera, fightCanvas);
+    orbitControls.enableDamping = true;
+    orbitControls.enabled = false;
+  }
+}
+
+function moveExplore(dt){
+  const eye = arenaToWorldY(EXPLORE.eyeArena);
+  const speed = arenaToWorldY(keys.ShiftLeft || keys.ShiftRight ? EXPLORE.runArena : EXPLORE.walkArena);
+  const climb = arenaToWorldY(EXPLORE.climbArena);
+
+  _exDir.set(
+    (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0),
+    0,
+    (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0)
+  );
+  if(_exDir.lengthSq() > 0) _exDir.normalize();
+
+  const p = fCamera.position;
+  const fromX = p.x, fromZ = p.z;
+  fpsControls.moveRight(_exDir.x * speed * dt);
+  fpsControls.moveForward(_exDir.z * speed * dt);
+
+  // Block the move if it would climb a ledge or leave the gym, sliding along each axis first so
+  // running into a wall at an angle still slides rather than sticking.
+  if(exploreGroundY(p.x, p.z) - exploreY > climb || !exploreWalkable(p.x, p.z)){
+    const okX = exploreGroundY(p.x, fromZ) - exploreY <= climb && exploreWalkable(p.x, fromZ);
+    const okZ = exploreGroundY(fromX, p.z) - exploreY <= climb && exploreWalkable(fromX, p.z);
+    if(okX) p.z = fromZ;
+    else if(okZ) p.x = fromX;
+    else { p.x = fromX; p.z = fromZ; }
+  }
+  exploreY += (exploreGroundY(p.x, p.z) - exploreY) * Math.min(1, dt * 12);
+  p.y = eye + exploreY;
+}
+
+/* Convert a point in arena units into world space (scale, then the 180-degree spin). */
+function arenaToWorld(ax, ay, az){
+  return new THREE.Vector3(-ax * ARENA_SCALE, ay * ARENA_SCALE, -az * ARENA_SCALE);
+}
+
+const exploreHintEl = document.getElementById('exploreHint');
+const exploreCrosshairEl = document.getElementById('exploreCrosshair');
+
+function updateExploreHint(){
+  const on = viewMode === 'fps' || viewMode === 'orbit';
+  exploreHintEl.classList.toggle('hidden', !on);
+  exploreCrosshairEl.classList.toggle('hidden', !(viewMode === 'fps' && fpsControls && fpsControls.isLocked));
+  if(!on) return;
+
+  const l1 = document.getElementById('exploreLine1');
+  const l2 = document.getElementById('exploreLine2');
+  if(viewMode === 'orbit'){
+    l1.textContent = 'ARENA OVERVIEW';
+    l2.innerHTML = 'DRAG&#8195;ORBIT&#8195;&#183;&#8195;SCROLL&#8195;ZOOM&#8195;&#183;&#8195;O&#8195;BACK TO WALKING';
+  } else if(fpsControls && fpsControls.isLocked){
+    l1.textContent = 'EXPLORING THE ARENA';
+    l2.innerHTML = 'WASD&#8195;WALK&#8195;&#183;&#8195;SHIFT&#8195;RUN&#8195;&#183;&#8195;O&#8195;OVERVIEW&#8195;&#183;&#8195;ESC&#8195;RELEASE CURSOR';
+  } else {
+    l1.textContent = 'CLICK TO LOOK AROUND';
+    l2.innerHTML = 'WASD&#8195;WALK&#8195;&#183;&#8195;SHIFT&#8195;RUN&#8195;&#183;&#8195;O&#8195;OVERVIEW&#8195;&#183;&#8195;ESC&#8195;RELEASE CURSOR';
+  }
+}
+
+function enterExplore(){
+  ensureExploreControls();
+  viewMode = 'fps';
+  orbitControls.enabled = false;
+
+  // Stand at the tunnel mouth looking down the walkout at the ring.
+  const spawnZ = ENTRANCE_START_Z + 3;
+  exploreY = exploreGroundY(0, spawnZ);
+  const eye = arenaToWorldY(EXPLORE.eyeArena);
+  fCamera.position.set(0, eye + exploreY, spawnZ);
+  fCamera.lookAt(0, eye + exploreY, 0);
+  updateExploreHint();
+}
+
+function exitExplore(){
+  if(fpsControls && fpsControls.isLocked) fpsControls.unlock();
+  if(orbitControls) orbitControls.enabled = false;
+  viewMode = 'fight';
+  updateExploreHint();
+}
+
+function toggleOrbit(){
+  if(viewMode === 'orbit'){
+    viewMode = 'fps';
+    orbitControls.enabled = false;
+    const spawnZ = ENTRANCE_START_Z + 3;
+    exploreY = exploreGroundY(0, spawnZ);
+    const eye = arenaToWorldY(EXPLORE.eyeArena);
+    fCamera.position.set(0, eye + exploreY, spawnZ);
+    fCamera.lookAt(0, eye + exploreY, 0);
+  } else if(viewMode === 'fps'){
+    viewMode = 'orbit';
+    fpsControls.unlock();
+    // The arena's own diorama angle, converted out of arena units.
+    fCamera.position.copy(arenaToWorld(120, 95, 120));
+    orbitControls.target.set(0, ringFloorY, 0);
+    orbitControls.enabled = true;
+    orbitControls.update();
+  }
+  updateExploreHint();
+}
 
 /* ----- FIGHTER FACTORY ----- */
 function createFighter(charData, side){
@@ -1423,6 +1640,12 @@ const keys = {};
 window.addEventListener('keydown', e=>{
   keys[e.code]=true;
   handleAttackKey(e.code);
+
+  // Explore-mode keys. Only live before the bell, so they can never shadow a fight input.
+  if(viewMode !== 'fight'){
+    if(e.code === 'KeyO') toggleOrbit();
+    if(e.code === 'Enter') beginMatchProper();
+  }
 });
 window.addEventListener('keyup', e=>{ keys[e.code]=false; });
 
@@ -1551,6 +1774,18 @@ function startMatch(){
   fCamera.position.set(0,3.4,ENTRANCE_START_Z - 2);
   fCamera.lookAt(0,2,ENTRANCE_START_Z - 6);
 
+  // Explore first if asked: the match only kicks off once the player leaves explore mode.
+  if(exploreOn){
+    enterExplore();
+  }else{
+    beginMatchProper();
+  }
+}
+
+/* The entrance/fight half of startMatch, split out so explore mode can defer it until the player
+   is done walking the arena. */
+function beginMatchProper(){
+  exitExplore();
   if(entranceOn){
     runEntranceSequence();
   }else{
@@ -1970,6 +2205,10 @@ function fightLoop(){
   
   requestAnimationFrame(fightLoop);
   const dt = Math.min(0.05, clock.getDelta());
+
+  // Explore mode drives the camera itself; it only ever runs before the bell.
+  if(viewMode === 'fps' && fpsControls && fpsControls.isLocked) moveExplore(dt);
+  else if(viewMode === 'orbit' && orbitControls) orbitControls.update();
 
   if(fightActive && !matchOver){
     const m1 = updatePlayerControls(p1F, p2F, P1_KEYS, dt);
