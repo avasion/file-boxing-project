@@ -771,7 +771,10 @@ window.AUDIO = (function(){
     crowdEl.volume = CROWD_BASE + (CROWD_PEAK - CROWD_BASE) * k;
   }
 
-  return { play, stopAll, isPlaying, audioEls, crowdEl, playCrowd, stopCrowd, setCrowdLevel };
+  /** Stop whatever track is playing, leaving the crowd bed alone. */
+  function stopMusic(){ stopCurrent(); }
+
+  return { play, stopMusic, stopAll, isPlaying, audioEls, crowdEl, playCrowd, stopCrowd, setCrowdLevel };
 })();
 </script>
 <!-- Loads THREE and the voxel arena modules from src/arena. The arena modules import 'three'
@@ -2099,9 +2102,15 @@ function runEntranceSequence(){
   async function walkOn(fighter, label){
     try{
       const key = (fighter.name||'').toUpperCase();
-      // The player's track is already running from the START MATCH click; restarting it here would
-      // drop the music back to the top just as they step out. The opponent's still starts here.
-      if(window.AUDIO && !window.AUDIO.isPlaying(key)) window.AUDIO.play(key, { durationMs: 6400 });
+      // A walkout owns the music from the moment it starts. The player's track is already running
+      // from the START MATCH click, so leave it be; otherwise this walkout takes the channel --
+      // stopping the previous boxer's track first, because play() no-ops for the three characters
+      // with no track of their own and would otherwise let the player's song run over the CPU's
+      // entrance.
+      if(window.AUDIO && !window.AUDIO.isPlaying(key)){
+        window.AUDIO.stopMusic();
+        window.AUDIO.play(key, { durationMs: 6400 });
+      }
     }catch(e){}
     nowEl.style.opacity=0;
     whoEl.style.opacity=0;
