@@ -740,9 +740,8 @@ window.AUDIO = (function(){
       next.play();
       if(durationMs && key !== 'menu'){
         currentTimer = setTimeout(() => {
-          try{ next.pause(); seekToStart(next, sounds[key].startAt); }catch(e){};
-          if(current === next) current = null;
           currentTimer = null;
+          if(current === next) fadeOutMusic(900);
         }, durationMs);
       }
     }catch(e){}
@@ -777,7 +776,31 @@ window.AUDIO = (function(){
   /** Stop whatever track is playing, leaving the crowd bed alone. */
   function stopMusic(){ stopCurrent(); }
 
-  return { play, stopMusic, stopAll, isPlaying, audioEls, crowdEl, playCrowd, stopCrowd, setCrowdLevel };
+  /* Ramp the playing track down and stop it. The channel is released up front, so anything that
+     starts or stops during the ramp is unaffected and the fading element is left to finish on its
+     own. Its volume is restored at the end -- the elements are reused, and a faded-out track that
+     kept its volume would walk out silent next time. */
+  let fadeFrame = 0;
+  function fadeOutMusic(ms = 1200){
+    const el = current;
+    if(!el) return;
+    if(currentTimer){ clearTimeout(currentTimer); currentTimer = null; }
+    current = null;
+    cancelAnimationFrame(fadeFrame);
+    const from = el.volume, t0 = performance.now();
+    const step = () => {
+      const p = Math.min(1, (performance.now() - t0) / ms);
+      el.volume = from * (1 - p);
+      if(p < 1){ fadeFrame = requestAnimationFrame(step); }
+      else {
+        try{ el.pause(); seekToStart(el, startOf(el)); }catch(e){}
+        el.volume = from;
+      }
+    };
+    fadeFrame = requestAnimationFrame(step);
+  }
+
+  return { play, stopMusic, fadeOutMusic, stopAll, isPlaying, audioEls, crowdEl, playCrowd, stopCrowd, setCrowdLevel };
 })();
 </script>
 <!-- Loads THREE and the voxel arena modules from src/arena. The arena modules import 'three'
@@ -2225,8 +2248,8 @@ function beginFight(){
   fCamera.position.copy(fightCamPos());
   fCamera.lookAt(fightCamTarget());
   showBigText('FIGHT!',1200);
-  // stopAll cuts the walkout track and the bed; bring the bed back up under the round.
-  try{ if(window.AUDIO){ window.AUDIO.stopAll(); window.AUDIO.playCrowd(); } }catch(e){}
+  // Ride the opponent's walkout out under the crowd rather than cutting it at the bell.
+  try{ if(window.AUDIO){ window.AUDIO.fadeOutMusic(1600); window.AUDIO.playCrowd(); } }catch(e){}
   crowdEnergy = 0.35;   // the bell gets a pop
   fightActive = true;
   clock.getDelta();
