@@ -52,10 +52,12 @@
 
   /* left column */
   #leftCol{ display:flex; flex-direction:column; gap:14px; grid-row:1/2; }
-  .menuTitle{ font-size:26px; padding:14px 18px 4px; color:var(--muted); letter-spacing:3px;}
-  #mainMenuList{ list-style:none; padding:10px; display:flex; flex-direction:column; gap:4px;}
+  .menuTitle{ font-size:22px; padding:12px 16px 2px; color:var(--muted); letter-spacing:3px;}
+  /* The nav is kept compact so the backstage panel below it keeps as much of the
+     column as possible -- its pages are the tallest content in the menu. */
+  #mainMenuList{ list-style:none; padding:8px; display:flex; flex-direction:column; gap:2px;}
   #mainMenuList li{
-    padding:14px 16px; font-size:20px; letter-spacing:2px; color:var(--muted);
+    padding:9px 16px; font-size:17px; letter-spacing:2px; color:var(--muted);
     cursor:pointer; transition:.15s; border-left:4px solid transparent;
   }
   #mainMenuList li:hover:not(.active){
@@ -95,10 +97,36 @@
   .backstagePage::-webkit-scrollbar-thumb{ background:#2a2a30; }
 
   .pageTitle{ font-size:14px; letter-spacing:2px; color:var(--gold); margin-bottom:10px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  /* The LOCKER ROOM badge (.backstageArt::after) is pinned to the top-right of the panel,
+     so the topmost title has to keep clear of it or long ones run underneath. */
+  .backstagePage > .pageTitle:first-child{ padding-right:104px; }
   .statRow{ display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:11px; color:var(--muted); border-bottom:1px solid rgba(42,42,48,0.4); }
   .statRow .label{ font-weight:600; }
   .statRow .val{ color:#fff; font-family:'Bebas Neue'; }
   .statRow.highlight{ background:rgba(192,20,28,0.15); padding:8px; margin:4px 0; border:1px solid var(--line); border-bottom:1px solid var(--line); }
+
+  /* Skill point allocation. The stepper controls sit in the ~300px backstage column,
+     so they get their own compact sizing rather than reusing .resultBtn. */
+  .ptsBar{ display:flex; align-items:center; gap:10px; padding:4px 0 8px; border-bottom:1px solid rgba(42,42,48,0.4); }
+  .ptsItem{ font-size:10px; font-weight:600; letter-spacing:1px; color:var(--muted); }
+  .ptsItem b{ margin-left:5px; font-family:'Bebas Neue'; font-size:16px; color:#fff; }
+  .ptsBar .miniBtn{ margin-left:auto; }
+  .upgradeRow{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:5px 0; border-bottom:1px solid rgba(42,42,48,0.4); }
+  .upgradeRow .uName{ font-size:11px; font-weight:600; letter-spacing:1px; color:var(--muted); }
+  .upgradeRow .uHint{ display:block; margin-top:2px; font-size:9px; font-weight:400; letter-spacing:0; color:#5c5c66; }
+  .stepper{ display:flex; align-items:center; gap:4px; }
+  .stepBtn{
+    width:22px; height:22px; padding:0; flex:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    background:#161619; border:1px solid var(--line); color:#fff; font-size:14px; line-height:1;
+  }
+  .stepBtn:hover{ border-color:var(--gold); color:var(--gold); }
+  .stepVal{ min-width:22px; text-align:center; font-family:'Bebas Neue'; font-size:15px; color:#fff; }
+  .miniBtn{
+    padding:6px 16px; cursor:pointer; font-family:inherit;
+    background:#161619; border:1px solid var(--line); color:#fff; font-size:11px; letter-spacing:2px;
+  }
+  .miniBtn:hover{ border-color:var(--gold); color:var(--gold); }
 
   .scoreboard{ width:100%; }
   .scoreRow{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; padding:8px; background:rgba(0,0,0,0.3); border:1px solid var(--line); }
@@ -317,42 +345,48 @@
               <span class="label">LAST RESULT</span>
               <span class="val" id="stat-lastResult">—</span>
             </div>
-          </div>
-            <div class="pageTitle" style="margin-top:12px;">SKILL POINTS & UPGRADES</div>
-            <div id="upgradesPanel" style="padding:8px;">
-              <div class="statRow">
-                <span class="label">PLAYER SKILL POINTS</span>
-                <span class="val" id="playerSkillPts">0</span>
+
+            <div class="pageTitle" style="margin-top:12px;">SKILL POINTS &amp; UPGRADES</div>
+            <div id="upgradesPanel">
+              <div class="ptsBar">
+                <span class="ptsItem">PLAYER<b id="playerSkillPts">0</b></span>
+                <span class="ptsItem">CPU<b id="cpuSkillPts">0</b></span>
+                <button class="miniBtn" id="resetUpgrades">RESET</button>
               </div>
-              <div class="statRow">
-                <span class="label">CPU SKILL POINTS</span>
-                <span class="val" id="cpuSkillPts">0</span>
+              <div class="upgradeRow">
+                <span class="uName">HEALTH<span class="uHint">+10 HP per point</span></span>
+                <span class="stepper">
+                  <button class="stepBtn" id="dec_hp" aria-label="Remove a Health point">&minus;</button>
+                  <span class="stepVal" id="player_hp">0</span>
+                  <button class="stepBtn" id="inc_hp" aria-label="Add a Health point">+</button>
+                </span>
               </div>
-              <div style="margin-top:8px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
-                <div style="font-size:12px; color:var(--muted);">Health</div>
-                <div style="text-align:center;"> <button class="resultBtn" id="dec_hp">-</button> <span id="player_hp" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_hp">+</button> </div>
-                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(+10 HP /pt)</span> </div>
+              <div class="upgradeRow">
+                <span class="uName">STAMINA<span class="uHint">Faster recovery</span></span>
+                <span class="stepper">
+                  <button class="stepBtn" id="dec_stam" aria-label="Remove a Stamina point">&minus;</button>
+                  <span class="stepVal" id="player_stam">0</span>
+                  <button class="stepBtn" id="inc_stam" aria-label="Add a Stamina point">+</button>
+                </span>
               </div>
-              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
-                <div style="font-size:12px; color:var(--muted);">Stamina</div>
-                <div style="text-align:center;"> <button class="resultBtn" id="dec_stam">-</button> <span id="player_stam" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_stam">+</button> </div>
-                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(faster recovery)</span> </div>
+              <div class="upgradeRow">
+                <span class="uName">ENERGY<span class="uHint">Improves block</span></span>
+                <span class="stepper">
+                  <button class="stepBtn" id="dec_energy" aria-label="Remove an Energy point">&minus;</button>
+                  <span class="stepVal" id="player_energy">0</span>
+                  <button class="stepBtn" id="inc_energy" aria-label="Add an Energy point">+</button>
+                </span>
               </div>
-              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
-                <div style="font-size:12px; color:var(--muted);">Energy</div>
-                <div style="text-align:center;"> <button class="resultBtn" id="dec_energy">-</button> <span id="player_energy" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_energy">+</button> </div>
-                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(improves block)</span> </div>
-              </div>
-              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
-                <div style="font-size:12px; color:var(--muted);">Damage</div>
-                <div style="text-align:center;"> <button class="resultBtn" id="dec_dmg">-</button> <span id="player_dmg" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_dmg">+</button> </div>
-                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(+8% damage /pt)</span> </div>
-              </div>
-              <div style="margin-top:8px; display:flex; gap:8px;">
-                <div class="resultBtn" id="resetUpgrades">RESET</div>
-                <div style="flex:1"></div>
+              <div class="upgradeRow">
+                <span class="uName">DAMAGE<span class="uHint">+8% damage per point</span></span>
+                <span class="stepper">
+                  <button class="stepBtn" id="dec_dmg" aria-label="Remove a Damage point">&minus;</button>
+                  <span class="stepVal" id="player_dmg">0</span>
+                  <button class="stepBtn" id="inc_dmg" aria-label="Add a Damage point">+</button>
+                </span>
               </div>
             </div>
+          </div>
 
           <!-- CAREER Page -->
           <div id="page-career" class="backstagePage">
