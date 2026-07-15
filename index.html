@@ -1971,6 +1971,8 @@ function runEntranceSequence(){
     const startZ = ENTRANCE_START_Z, endZ = ENTRANCE_END_Z;
     const camStartZ = ENTRANCE_START_Z - 2, camEndZ = 9;
     const dur = 3200;
+    // Loop the walk clip for the length of the walkout; the mixer is ticked by the fight loop.
+    if(fighter.anim) fighter.anim.play('walk');
     const t0 = performance.now();
     await new Promise(res=>{
       function step(t){
@@ -1981,8 +1983,6 @@ function runEntranceSequence(){
           const x = entrancePathX(z);
           const gy = entranceGroundY(x, z);
           fighter.group.position.set(x, gy + fighter.footOffset, z);
-          fighter.walkPhase += 0.25;
-          animateWalkCycle(fighter);
           // Track the fighter across as they peel off towards the steps, and ride up with them.
           fCamera.position.set(x*0.5 + Math.sin(p*3)*0.6, 3.2 + gy, camStartZ+(camEndZ-camStartZ)*ease);
           fCamera.lookAt(x, gy + 1.4, z - 2);
@@ -1994,6 +1994,8 @@ function runEntranceSequence(){
     });
     const endX = entrancePathX(endZ);
     fighter.group.position.set(endX, entranceGroundY(endX, endZ) + fighter.footOffset, endZ);
+    // A looping clip stops wherever it happens to be, so settle the rig back onto the guard.
+    if(fighter.anim){ fighter.anim.stop('walk'); fighter.anim.guard(); }
 
     await fadeEl(whoEl,0,300);
     await fadeEl(nowEl,0,200);

@@ -70,6 +70,27 @@ const CLIP_DEFS = {
     { t: 0.55, pose: {} },
   ],
 
+  // IDLE: breathing in the guard. Loops; first and last keys match so it seams.
+  // Everything stays on the guard silhouette -- only the chest lifts and the gloves ride with it.
+  idle: [
+    { t: 0.00, pose: {}, hips: [0, 0, 0] },
+    { t: 1.20, pose: { Spine: [0.10, 0, 0], Head: [0.14, 0.05, 0], Shoulder_L: [0, -1.24, 0.56], Shoulder_R: [0, 1.24, -0.56] }, hips: [0, 0.14, 0] },
+    { t: 2.40, pose: {}, hips: [0, 0, 0] },
+  ],
+
+  // WALK: two full steps. Loops; first and last keys match so it seams.
+  // The rig faces +Z and the legs hang down -Y, so a negative Hip x swings that leg forward and a
+  // positive Knee x picks the heel up behind. Arms stay in the guard -- this is a walk to the ring,
+  // not a stroll -- with the spine counter-rotating against the lead leg and the hips bobbing twice
+  // per cycle, once per footfall.
+  walk: [
+    { t: 0.00, pose: { Hip_L: [-0.55, 0.1, 0], Knee_L: [0.15, 0, 0], Hip_R: [0.45, -0.1, 0], Knee_R: [0.55, 0, 0], Spine: [0.06, 0.09, 0] }, hips: [0, -0.18, 0] },
+    { t: 0.20, pose: { Hip_L: [-0.20, 0.1, 0], Knee_L: [0.10, 0, 0], Hip_R: [0.05, -0.1, 0], Knee_R: [0.22, 0, 0], Spine: [0.06, 0, 0] }, hips: [0, 0.16, 0] },
+    { t: 0.40, pose: { Hip_L: [0.45, 0.1, 0], Knee_L: [0.55, 0, 0], Hip_R: [-0.55, -0.1, 0], Knee_R: [0.15, 0, 0], Spine: [0.06, -0.09, 0] }, hips: [0, -0.18, 0] },
+    { t: 0.60, pose: { Hip_L: [0.05, 0.1, 0], Knee_L: [0.22, 0, 0], Hip_R: [-0.20, -0.1, 0], Knee_R: [0.10, 0, 0], Spine: [0.06, 0, 0] }, hips: [0, 0.16, 0] },
+    { t: 0.80, pose: { Hip_L: [-0.55, 0.1, 0], Knee_L: [0.15, 0, 0], Hip_R: [0.45, -0.1, 0], Knee_R: [0.55, 0, 0], Spine: [0.06, 0.09, 0] }, hips: [0, -0.18, 0] },
+  ],
+
   // 5 — KICK: rear-leg front kick — chamber, extend, replant
   kick: [
     { t: 0.00, pose: {} },
@@ -117,13 +138,20 @@ export const CLIPS = Object.entries(CLIP_DEFS).map(([name, keys]) => buildClip(n
 /* ---------------------------- animator ---------------------------- */
 /** One animator per fighter. play() returns the action so callers can time
  *  hit windows off action.time if needed. */
+/** Clips that run until stopped, rather than firing once and settling back into the guard. */
+export const LOOPING = new Set(['idle', 'walk']);
+
 export function createFighterAnimator(boxer) {
   const mixer = new THREE.AnimationMixer(boxer);
   const actions = {};
   for (const clip of CLIPS) {
     const a = mixer.clipAction(clip);
-    a.setLoop(THREE.LoopOnce, 1);
-    a.clampWhenFinished = false; // last key returns to guard on its own
+    if (LOOPING.has(clip.name)) {
+      a.setLoop(THREE.LoopRepeat, Infinity);
+    } else {
+      a.setLoop(THREE.LoopOnce, 1);
+      a.clampWhenFinished = false; // last key returns to guard on its own
+    }
     actions[clip.name] = a;
   }
   // start in the guard stance
@@ -140,6 +168,15 @@ export function createFighterAnimator(boxer) {
       a.play();
       return a;
     },
+    /** Stop a clip. A looping clip is left wherever it was, so snap back to the guard after it. */
+    stop(name) {
+      const a = actions[name];
+      if (!a) return null;
+      a.stop();
+      return a;
+    },
+    /** Snap the rig to the guard stance — the rest pose everything else is authored against. */
+    guard() { setPose(boxer, GUARD); },
     isBusy() { return Object.values(actions).some((a) => a.isRunning()); },
     update(dt) { mixer.update(dt); },
   };
