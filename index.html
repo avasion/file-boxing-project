@@ -1171,6 +1171,9 @@ function createPreviewFighter(charData){
   return group;
 }
 
+/* Assigned by previewScene below, which runs before any card can be clicked. */
+let setPreviewCharacter = () => {};
+
 const cardGrid = document.getElementById('cardGrid');
 CHARACTERS.forEach((c,i)=>{
   const card = document.createElement('div');
@@ -1188,6 +1191,7 @@ CHARACTERS.forEach((c,i)=>{
     picks.p1 = i;
     const pool = CHARACTERS.map((_,idx)=>idx).filter(idx=>idx!==i);
     picks.p2 = pool[Math.floor(Math.random()*pool.length)];
+    setPreviewCharacter(i);      // the boxer you picked takes the plinth
     refreshCards();
     refreshVs();
     updateStartBtn();
@@ -1282,8 +1286,12 @@ let previewCharIdx = 0;
   // falloff reads their intensities as near-black.
   renderer.useLegacyLights = true;
   const scene = new THREE.Scene();
+  // Framed for the whole boxer plus the roped ring: the rig stands ~2.9 tall (Bear 3.3), so the
+  // camera sits back and looks at chest height rather than at the knees, which put the head up
+  // into the IGNITE title overlaying the canvas.
+  const PREVIEW_ORBIT_R = 9.4, PREVIEW_CAM_Y = 4.2, PREVIEW_LOOK_Y = 1.5;
   const camera = new THREE.PerspectiveCamera(50,1,0.1,100);
-  camera.position.set(0,3.4,7.5);
+  camera.position.set(0,PREVIEW_CAM_Y,PREVIEW_ORBIT_R);
   camera.lookAt(0,1,0);
 
   const ring = new THREE.Mesh(new THREE.BoxGeometry(6,0.3,6), new THREE.MeshStandardMaterial({color:0x151519}));
@@ -1294,22 +1302,51 @@ let previewCharIdx = 0;
   // stands on this, not on y=0 -- the mat is what's visible under the boots.
   const PREVIEW_CANVAS_TOP = canvasMat.position.y + 0.025;
 
-  const charData = CHARACTERS[previewCharIdx];
-  const fighter = createPreviewFighter(charData);
-  fighter.position.y = PREVIEW_CANVAS_TOP + PREVIEW_FOOT_OFFSET;
-  scene.add(fighter);
-
-  // The preview boxer breathes in the guard rather than standing in the rig's T-pose. Same
-  // animator the fighters use, so the card shows the stance you start the round in.
-  const previewAnim = window.ANIM.createFighterAnimator(fighter);
-  previewAnim.play('idle');
+  // The boxer on the plinth is swapped by picking a card. previewScene owns the scene, so it
+  // publishes the swap rather than letting the card handler reach in here.
+  let fighter = null, previewAnim = null;
   const previewClock = new THREE.Clock();
 
-  const postGeo = new THREE.CylinderGeometry(0.05,0.05,2.2,8);
+  function buildPreview(idx){
+    previewCharIdx = idx;
+    if(fighter){
+      scene.remove(fighter);
+      // The boxers are built per-call, so their geometry is this model's alone to release.
+      fighter.traverse(o => { if(o.isMesh){ o.geometry.dispose(); o.material.dispose(); } });
+    }
+    fighter = createPreviewFighter(CHARACTERS[idx]);
+    fighter.position.y = PREVIEW_CANVAS_TOP + PREVIEW_FOOT_OFFSET;
+    scene.add(fighter);
+    // Breathes in the guard rather than standing in the rig's T-pose. Same animator the fighters
+    // use, so the card shows the stance you start the round in.
+    previewAnim = window.ANIM.createFighterAnimator(fighter);
+    previewAnim.play('idle');
+  }
+  buildPreview(previewCharIdx);
+  setPreviewCharacter = buildPreview;
+
+  const POST_XZ = 2.9, POST_H = 2.2;
+  const postGeo = new THREE.CylinderGeometry(0.05,0.05,POST_H,8);
   const postMat = new THREE.MeshStandardMaterial({color:0x333});
-  [[2.9,2.9],[-2.9,2.9],[2.9,-2.9],[-2.9,-2.9]].forEach(([x,z])=>{
-    const p = new THREE.Mesh(postGeo, postMat); p.position.set(x,1.1,z); scene.add(p);
+  [[POST_XZ,POST_XZ],[-POST_XZ,POST_XZ],[POST_XZ,-POST_XZ],[-POST_XZ,-POST_XZ]].forEach(([x,z])=>{
+    const p = new THREE.Mesh(postGeo, postMat); p.position.set(x,POST_H/2,z); scene.add(p);
   });
+
+  // Guard rails, strung post to post. Red front and back, cream down the sides, the way the arena's
+  // own ring is roped, so the plinth reads as the ring you fight in.
+  const ropeGeo = new THREE.CylinderGeometry(0.045,0.045,POST_XZ*2,6);
+  const ropeRed   = new THREE.MeshStandardMaterial({color:0xb5473f, roughness:0.8});
+  const ropeCream = new THREE.MeshStandardMaterial({color:0xd9d2bd, roughness:0.8});
+  for(const y of [0.55, 1.05, 1.55, 2.02]){
+    for(const z of [-POST_XZ, POST_XZ]){          // front and back, spanning X
+      const m = new THREE.Mesh(ropeGeo, ropeRed);
+      m.rotation.z = Math.PI/2; m.position.set(0, y, z); scene.add(m);
+    }
+    for(const x of [-POST_XZ, POST_XZ]){          // the two sides, spanning Z
+      const m = new THREE.Mesh(ropeGeo, ropeCream);
+      m.rotation.x = Math.PI/2; m.position.set(x, y, 0); scene.add(m);
+    }
+  }
 
   const amb = new THREE.AmbientLight(0x445, 0.5); scene.add(amb);
   const spot1 = new THREE.SpotLight(0x6688ff, 6, 20, 0.6, 0.5); spot1.position.set(-4,6,4); scene.add(spot1);
@@ -1325,9 +1362,10 @@ let previewCharIdx = 0;
     requestAnimationFrame(loop);
     resize();
     t+=0.005;
-    camera.position.x = Math.sin(t)*7.5;
-    camera.position.z = Math.cos(t)*7.5;
-    camera.lookAt(0,0.8,0);
+    camera.position.x = Math.sin(t)*PREVIEW_ORBIT_R;
+    camera.position.z = Math.cos(t)*PREVIEW_ORBIT_R;
+    camera.position.y = PREVIEW_CAM_Y;
+    camera.lookAt(0,PREVIEW_LOOK_Y,0);
 
     // The idle clip does the breathing, off the hips, so the boots stay planted on the mat.
     previewAnim.update(previewClock.getDelta());
@@ -1702,7 +1740,6 @@ function createFighter(charData, side){
     blockMax, blockMeter: blockMax, guardBroken:false,
     damageMul: damageMul, staminaBonus: staminaBonus, energy: energy, blockReduction: blockReduction,
     attackAnim:null,
-    walkPhase:0,
     facing:1,
     footOffset: footOffset,
     pos: new THREE.Vector3(),
@@ -1841,17 +1878,6 @@ function startAttack(f, type){
 
 function groundY(f){ return ringFloorY + f.footOffset; }
 
-function resetAttackPose(f){
-  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
-  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
-  if(!f.torso) return;
-  f.rightArm.shoulder.rotation.set(0,0,0);
-  f.leftArm.shoulder.rotation.set(0,0,0);
-  f.rightArm.elbow.rotation.set(0,0,0);
-  f.leftArm.elbow.rotation.set(0,0,0);
-  f.torso.rotation.set(0,0,0);
-  f.group.position.y = groundY(f);
-}
 
 /* ----- ENTRANCE SEQUENCE ----- */
 function startMatch(){
@@ -2038,17 +2064,6 @@ function runEntranceSequence(){
   })();
 }
 
-function animateWalkCycle(f){
-  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
-  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
-  if(!f.torso) return;
-  const s = Math.sin(f.walkPhase)*0.5;
-  f.leftLeg.hip.rotation.x = s;
-  f.rightLeg.hip.rotation.x = -s;
-  f.leftArm.shoulder.rotation.x = -s*0.6;
-  f.rightArm.shoulder.rotation.x = s*0.6;
-}
-
 function showBigText(text, ms){
   const el = document.getElementById('bigText');
   el.textContent = text;
@@ -2108,7 +2123,6 @@ function updatePlayerControls(f, opponent, K, dt){
     f.group.position.z += moveVec.z*MOVE_SPEED*dt;
     f.group.position.x = THREE.MathUtils.clamp(f.group.position.x,-BOUND,BOUND);
     f.group.position.z = THREE.MathUtils.clamp(f.group.position.z,-BOUND,BOUND);
-    f.walkPhase += dt*8;
     moving = true;
   }
   // A broken guard cannot be raised until the block meter recovers.
@@ -2156,7 +2170,6 @@ function updateCPU(cpu, player, dt){
     cpu.group.position.z += moveVec.z*MOVE_SPEED*0.82*dt;
     cpu.group.position.x = THREE.MathUtils.clamp(cpu.group.position.x,-BOUND,BOUND);
     cpu.group.position.z = THREE.MathUtils.clamp(cpu.group.position.z,-BOUND,BOUND);
-    cpu.walkPhase += dt*8;
     moving = true;
   }
 
@@ -2223,8 +2236,8 @@ function updateAttackAnim(f, opponent, dt){
   }
 
   if(p>=1){
+    // The clip's last keyframe is the guard, so it lands there on its own.
     f.attackAnim = null;
-    resetAttackPose(f);
   }
 }
 
@@ -2270,19 +2283,24 @@ function facePlayers(){
   p2F.group.rotation.y = angle + Math.PI;
 }
 
+/* Foot movement in the round runs the same looping walk clip the walkout uses. Every clip carries
+ * tracks for all of GUARD's joints -- legs included -- so a punch and a walk would fight over the
+ * same bones: an attack takes the rig, and the walk picks back up when the fighter is moving again
+ * and not throwing. */
 function updateWalkPose(f, moving){
-  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
-  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
-  if(!f.torso) return;
-  if(f.attackAnim) return;
-  if(moving){
-    animateWalkCycle(f);
-  }else{
-    f.leftLeg.hip.rotation.x = THREE.MathUtils.lerp(f.leftLeg.hip.rotation.x,0,0.2);
-    f.rightLeg.hip.rotation.x = THREE.MathUtils.lerp(f.rightLeg.hip.rotation.x,0,0.2);
+  if(!f.anim || f.ko) return;
+  const walk = f.anim.actions.walk;
+  if(!walk) return;
+  const shouldWalk = moving && !f.attackAnim;
+
+  if(shouldWalk){
+    if(!walk.isRunning()) f.anim.play('walk');
+  } else if(walk.isRunning()){
+    f.anim.stop('walk');
+    // A stopped loop leaves the legs mid-stride; settle them, unless an attack now owns the rig
+    // and is about to pose it anyway.
+    if(!f.attackAnim) f.anim.guard();
   }
-  f.leftArm.shoulder.rotation.x = THREE.MathUtils.lerp(f.leftArm.shoulder.rotation.x, f.blocking?-1.4:0, 0.25);
-  f.rightArm.shoulder.rotation.x = THREE.MathUtils.lerp(f.rightArm.shoulder.rotation.x, f.blocking?-1.4:0, 0.25);
 }
 
 function triggerKO(loser, winner){
