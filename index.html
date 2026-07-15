@@ -1281,11 +1281,19 @@ let previewCharIdx = 0;
    ========================================================================= */
 const fightCanvas = document.getElementById('fightCanvas');
 const fRenderer = new THREE.WebGLRenderer({canvas:fightCanvas, antialias:true});
-// As above: the fight lights predate r155's physical light units, so hold the legacy model.
-fRenderer.useLegacyLights = true;
+// Match the arena reference build: physical lights (its rig is authored in candela), ACES tone
+// mapping and soft shadows. The menu preview keeps the legacy model for its own older lights.
+fRenderer.useLegacyLights = false;
+fRenderer.shadowMap.enabled = true;
+fRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+fRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+fRenderer.toneMappingExposure = 1.05;
 fRenderer.setPixelRatio(Math.min(devicePixelRatio,2));
 const fScene = new THREE.Scene();
-fScene.fog = new THREE.Fog(0x05050a, 14, 40);
+fScene.background = new THREE.Color('#0d0d0b');
+// The arena fogs from 180 to 420 in its own units; ARENA_SCALE is not known until buildArena, so
+// the range is set there.
+fScene.fog = new THREE.Fog('#0d0d0b', 180, 420);
 const fCamera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
 
 function resizeFight(){
@@ -1296,11 +1304,8 @@ function resizeFight(){
 window.addEventListener('resize', resizeFight);
 resizeFight();
 
-/* lighting */
-fScene.add(new THREE.AmbientLight(0x33344a, 0.7));
-const key1 = new THREE.SpotLight(0xffffff, 3.2, 40, 0.55, 0.4); key1.position.set(-6,10,6); fScene.add(key1);
-const key2 = new THREE.SpotLight(0x88aaff, 2.4, 40, 0.55, 0.4); key2.position.set(6,10,-4); fScene.add(key2);
-const rim  = new THREE.PointLight(0xff2a34, 3, 30); rim.position.set(0,4,-10); fScene.add(rim);
+/* Lighting is the arena's own rig, built in buildArenaLighting() once ARENA_SCALE is known. */
+let tunnelLight = null, tunnelBaseIntensity = 0;
 
 const RING_SIZE = 8;
 
@@ -1320,6 +1325,56 @@ let ARENA_SCALE = 1;
 function worldToArena(wx, wz){ return { x: -wx / ARENA_SCALE, z: -wz / ARENA_SCALE }; }
 function arenaToWorldY(ay){ return ay * ARENA_SCALE; }
 
+/* The arena's own lighting rig, as authored in the reference build. Its lights are physical
+ * (candela with decay), so shrinking the arena by ARENA_SCALE means an intensity of I at distance
+ * d now sits at distance d*scale and would read scale^-2 too bright. Positions and ranges scale by
+ * ARENA_SCALE and intensities by its square, which keeps the illuminance -- and so the look -- put. */
+function buildArenaLighting(){
+  const { RING, GYM } = window.ARENA;
+  const s = ARENA_SCALE, i2 = s * s;
+  const spot = (color, intensity, distance, angle, penumbra, decay, pos, target) => {
+    const l = new THREE.SpotLight(color, intensity * i2, distance * s, angle, penumbra, decay);
+    l.position.copy(arenaToWorld(...pos));
+    l.target.position.copy(arenaToWorld(...target));
+    fScene.add(l, l.target);
+    return l;
+  };
+  const point = (color, intensity, distance, decay, pos) => {
+    const l = new THREE.PointLight(color, intensity * i2, distance * s, decay);
+    l.position.copy(arenaToWorld(...pos));
+    fScene.add(l);
+    return l;
+  };
+
+  fScene.add(new THREE.AmbientLight('#5a5044', 0.55));
+  fScene.add(new THREE.HemisphereLight('#8a8172', '#1a160f', 0.35));
+
+  // key ring spotlight — warm, hard-edged, the one shadow caster
+  const key = spot('#ffe9c4', 6000, 260, Math.PI / 4.6, 0.45, 1.8, [0, 110, 8], [0, RING.top, 0]);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.bias = -0.0005;
+
+  // cross fills over the ring corners
+  for(const [x, z] of [[-50, -40], [50, 40]])
+    spot('#ffd9a0', 1900, 220, Math.PI / 5, 0.6, 2, [x, 85, z], [0, RING.top, 0]);
+
+  // amber tunnel glow
+  tunnelLight = point('#ffb84d', 1300, 90, 1.9, [0, 15, GYM.z0 - 18]);
+  tunnelBaseIntensity = tunnelLight.intensity;
+  point('#ffcf70', 750, 55, 1.9, [0, 14, GYM.z0 - GYM.tunnel.depth + 8]);
+  point('#ffc86a', 850, 60, 1.9, [0, 17, GYM.z0 - 32]);
+
+  // mural wash + locker-row practicals
+  spot('#ffdca8', 1500, 120, Math.PI / 5, 0.7, 2, [0, 30, GYM.z0 + 46], [0, GYM.tunnel.h + 18, GYM.z0]);
+  point('#ffd9a0', 520, 80, 2, [GYM.x0 + 40, 30, GYM.z0 + 26]);
+  point('#ffd9a0', 640, 95, 2, [GYM.x1 - 22, 48, GYM.z0 + 45]);
+
+  // house lights over the stands so the crowd reads in the gloom
+  for(const [hx, hz] of [[64, 0], [-64, -14], [0, 62]])
+    point('#e8d9b0', 700, 100, 2, [hx, 48, hz]);
+}
+
 function buildArena(){
   const { buildGym, buildRing, buildStands, RING } = window.ARENA;
   const arena = new THREE.Group();
@@ -1331,20 +1386,43 @@ function buildArena(){
   arena.rotation.y = Math.PI;
   arenaModel = arena;
   fScene.add(arena);
+  arena.traverse(o => { if(o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  buildArenaLighting();
+  fScene.fog.near = 180 * ARENA_SCALE;
+  fScene.fog.far = 420 * ARENA_SCALE;
   // measureRingFloor raycasts in world space, so the transform above has to be baked in before
   // it runs -- otherwise it reads the arena at identity and finds the gym floor, not the canvas.
   arena.updateMatrixWorld(true);
   measureRingFloor();
 }
 
-/* The gym floor is flat concrete from the tunnel mouth to the ring apron, so the walkout runs at
- * y=0 the whole way in; measureRingFloor puts the fighters up on the canvas once the bell rings. */
-function entranceGroundY(z){ return 0; }
+/* The walkout reads its floor height straight off the arena, so the fighters walk the gym at y=0
+ * and then climb the corner steps onto the canvas the same way a player does on foot. */
+function entranceGroundY(x, z){ return exploreGroundY(x, z); }
+
+/* The ring's only way in is the corner steps, which sit off to one side at x~2.6 -- but the tunnel
+ * is only ~2.3 wide, so the walkout runs down the centreline and drifts across to the steps as it
+ * comes up on them. */
+function entranceStepsX(){
+  const { RING } = window.ARENA;
+  return -((RING.steps.x0 + RING.steps.x1) / 2) * ARENA_SCALE;
+}
+function entranceStepsZ(){
+  return -window.ARENA.RING.steps.zOuter * ARENA_SCALE;   // the outer (bottom) lip of the steps
+}
+function entrancePathX(z){
+  const stepsZ = entranceStepsZ();
+  const driftFrom = stepsZ + 3.5;                          // begin easing over this far out
+  const t = THREE.MathUtils.clamp((driftFrom - z) / (driftFrom - stepsZ), 0, 1);
+  return entranceStepsX() * (t * t * (3 - 2 * t));         // smoothstep so the turn isn't a corner
+}
 
 /* Where the walkout begins: just inside the tunnel mouth, which the gym puts at z=15, walking to
  * the ring apron at z=5.1. The runway itself is only ~3.1 units tall once scaled and the entrance
  * camera rides at y=3.2, so the walk is staged in the gym rather than back inside the tunnel. */
 const ENTRANCE_START_Z = 14;
+/* Finish the walk up on the canvas, just inside the ropes. */
+const ENTRANCE_END_Z = 4.4;
 
 /* =========================================================================
    EXPLORE MODE — walk the arena before the bell
@@ -1471,17 +1549,25 @@ function updateExploreHint(){
   }
 }
 
-function enterExplore(){
-  ensureExploreControls();
-  viewMode = 'fps';
-  orbitControls.enabled = false;
+/* Spawn where the reference build does: deep in the walkout runway, facing the light. */
+function exploreSpawnZ(){
+  const { GYM } = window.ARENA;
+  return -(GYM.z0 - GYM.tunnel.depth + 10) * ARENA_SCALE;
+}
 
-  // Stand at the tunnel mouth looking down the walkout at the ring.
-  const spawnZ = ENTRANCE_START_Z + 3;
+function placeExploreCamera(){
+  const spawnZ = exploreSpawnZ();
   exploreY = exploreGroundY(0, spawnZ);
   const eye = arenaToWorldY(EXPLORE.eyeArena);
   fCamera.position.set(0, eye + exploreY, spawnZ);
   fCamera.lookAt(0, eye + exploreY, 0);
+}
+
+function enterExplore(){
+  ensureExploreControls();
+  viewMode = 'fps';
+  orbitControls.enabled = false;
+  placeExploreCamera();
   updateExploreHint();
 }
 
@@ -1496,11 +1582,7 @@ function toggleOrbit(){
   if(viewMode === 'orbit'){
     viewMode = 'fps';
     orbitControls.enabled = false;
-    const spawnZ = ENTRANCE_START_Z + 3;
-    exploreY = exploreGroundY(0, spawnZ);
-    const eye = arenaToWorldY(EXPLORE.eyeArena);
-    fCamera.position.set(0, eye + exploreY, spawnZ);
-    fCamera.lookAt(0, eye + exploreY, 0);
+    placeExploreCamera();
   } else if(viewMode === 'fps'){
     viewMode = 'orbit';
     fpsControls.unlock();
@@ -1588,6 +1670,10 @@ function createFighter(charData, side){
   const stamina = (up.stamina||0) * 0.12; // affects attack speed / cooldown
   const energy = (up.energy||0) * 0.12;   // affects block effectiveness
   const blockReduction = Math.max(0.08, 0.22 - (up.energy||0) * 0.03);
+
+  // The arena's key spot is the scene's shadow caster; let the fighters drop shadows on the canvas
+  // the way the arena's own voxel figures do.
+  group.traverse(o => { if(o.isMesh) o.castShadow = true; });
 
   return {
     group, torso, head, rightArm, leftArm, rightLeg, leftLeg,
@@ -1763,8 +1849,8 @@ function startMatch(){
   document.getElementById('controlsHint').classList.add('hidden');
   document.getElementById('resultScreen').style.display='none';
 
-  p1F.group.position.set(0, entranceGroundY(ENTRANCE_START_Z) + p1F.footOffset, ENTRANCE_START_Z);
-  p2F.group.position.set(0, entranceGroundY(ENTRANCE_START_Z) + p2F.footOffset, ENTRANCE_START_Z);
+  p1F.group.position.set(0, entranceGroundY(0, ENTRANCE_START_Z) + p1F.footOffset, ENTRANCE_START_Z);
+  p2F.group.position.set(0, entranceGroundY(0, ENTRANCE_START_Z) + p2F.footOffset, ENTRANCE_START_Z);
   p1F.group.visible=false;
   p2F.group.visible=false;
   p1F.group.rotation.y = Math.PI;
@@ -1853,13 +1939,14 @@ function runEntranceSequence(){
     whoEl.style.opacity=0;
     whoEl.textContent = label;
     fighter.group.visible=true;
-    fighter.group.position.set(0, entranceGroundY(ENTRANCE_START_Z) + fighter.footOffset, ENTRANCE_START_Z);
+    fighter.group.position.set(0, entranceGroundY(0, ENTRANCE_START_Z) + fighter.footOffset, ENTRANCE_START_Z);
     fighter.group.rotation.y = Math.PI;
 
     await fadeEl(nowEl,1,350);
     await fadeEl(whoEl,1,400);
 
-    const startZ = ENTRANCE_START_Z, endZ = 5.2;
+    // End up on the canvas rather than at the apron: the last stretch is the climb.
+    const startZ = ENTRANCE_START_Z, endZ = ENTRANCE_END_Z;
     const camStartZ = ENTRANCE_START_Z - 2, camEndZ = 9;
     const dur = 3200;
     const t0 = performance.now();
@@ -1868,20 +1955,23 @@ function runEntranceSequence(){
         const p = Math.min(1,(t-t0)/dur);
         const ease = 1-Math.pow(1-p,2);
         if(!skipRequested){
-          fighter.group.position.z = startZ + (endZ-startZ)*ease;
-          fighter.group.position.y = entranceGroundY(fighter.group.position.z) + fighter.footOffset;
+          const z = startZ + (endZ-startZ)*ease;
+          const x = entrancePathX(z);
+          const gy = entranceGroundY(x, z);
+          fighter.group.position.set(x, gy + fighter.footOffset, z);
           fighter.walkPhase += 0.25;
           animateWalkCycle(fighter);
-          fCamera.position.set(Math.sin(p*3)*0.6, 3.2, camStartZ+(camEndZ-camStartZ)*ease);
-          fCamera.lookAt(0,1.6, fighter.group.position.z-2);
+          // Track the fighter across as they peel off towards the steps, and ride up with them.
+          fCamera.position.set(x*0.5 + Math.sin(p*3)*0.6, 3.2 + gy, camStartZ+(camEndZ-camStartZ)*ease);
+          fCamera.lookAt(x, gy + 1.4, z - 2);
         }
         if(p<1 && !skipRequested) requestAnimationFrame(step);
         else res();
       }
       requestAnimationFrame(step);
     });
-    fighter.group.position.z = endZ;
-    fighter.group.position.y = entranceGroundY(endZ) + fighter.footOffset;
+    const endX = entrancePathX(endZ);
+    fighter.group.position.set(endX, entranceGroundY(endX, endZ) + fighter.footOffset, endZ);
 
     await fadeEl(whoEl,0,300);
     await fadeEl(nowEl,0,200);
@@ -2209,6 +2299,9 @@ function fightLoop(){
   // Explore mode drives the camera itself; it only ever runs before the bell.
   if(viewMode === 'fps' && fpsControls && fpsControls.isLocked) moveExplore(dt);
   else if(viewMode === 'orbit' && orbitControls) orbitControls.update();
+
+  // Sodium-lamp hum on the tunnel glow, as the arena reference does it.
+  if(tunnelLight) tunnelLight.intensity = tunnelBaseIntensity * (1 + Math.sin(clock.elapsedTime * 7.3) * 0.031);
 
   if(fightActive && !matchOver){
     const m1 = updatePlayerControls(p1F, p2F, P1_KEYS, dt);
