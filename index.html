@@ -728,14 +728,16 @@ window.AUDIO = (function(){
 <script type="module">
 (async () => {
   try {
-    const [THREE, gym, ring, stands, plc, oc] = await Promise.all([
+    const [THREE, gym, ring, stands, plc, oc, chars] = await Promise.all([
       import('three'),
       import('./src/arena/gym.js'),
       import('./src/arena/ring.js'),
       import('./src/arena/stands.js'),
       import('three/addons/controls/PointerLockControls.js'),
       import('three/addons/controls/OrbitControls.js'),
+      import('./src/characterMap.js'),
     ]);
+    window.CHARACTER_MAP = chars;
     window.THREE = THREE;
     window.ARENA = {
       buildGym: gym.buildGym,
@@ -1105,53 +1107,9 @@ function updateStatsUI(){
 const PREVIEW_FOOT_OFFSET = 0;
 
 function createPreviewFighter(charData){
-  const group = new THREE.Group();
-  const skin = 0xc79a73;
-  const mat = new THREE.MeshStandardMaterial({color:charData.color, roughness:0.5, metalness:0.15});
-  const darkMat = new THREE.MeshStandardMaterial({color:charData.dark, roughness:0.6});
-  const skinMat = new THREE.MeshStandardMaterial({color:skin, roughness:0.7});
-
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.75,0.36), mat);
-  torso.position.y = 1.28;
-  group.add(torso);
-
-  const hips = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,0.34), darkMat);
-  hips.position.y = 0.86;
-  group.add(hips);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22,12,12), skinMat);
-  head.position.y = 1.86;
-  group.add(head);
-
-  const shoulderL = new THREE.Group();
-  shoulderL.position.set(0.42, 1.58, 0);
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.42,0.19), skinMat);
-  armL.position.y = -0.21;
-  shoulderL.add(armL);
-  const gloveL = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), darkMat);
-  gloveL.position.y = -0.42;
-  armL.add(gloveL);
-  group.add(shoulderL);
-
-  const shoulderR = new THREE.Group();
-  shoulderR.position.set(-0.42, 1.58, 0);
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.42,0.19), skinMat);
-  armR.position.y = -0.21;
-  shoulderR.add(armR);
-  const gloveR = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), darkMat);
-  gloveR.position.y = -0.42;
-  armR.add(gloveR);
-  group.add(shoulderR);
-
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.9,0.22), darkMat);
-  legL.position.set(0.16, 0.45, 0);
-  group.add(legL);
-
-  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.9,0.22), darkMat);
-  legR.position.set(-0.16, 0.45, 0);
-  group.add(legR);
-
-  group.userData.shoulders = [shoulderL, shoulderR];
+  // Same boxer the fight uses, at the same scale, so the card preview is what you get in the ring.
+  const group = window.CHARACTER_MAP.buildCharacterModel(charData.name);
+  group.scale.multiplyScalar(ARENA_SCALE);
   return group;
 }
 
@@ -1250,6 +1208,13 @@ document.getElementById('startMatchBtn').addEventListener('click', ()=>{
   startMatch();
 });
 
+/* The ring the fight is fought in, and the factor that takes the arena's own units into the
+ * game's. The arena and the boxers are both authored at arena scale, so anything built from
+ * src/arena is placed by multiplying through ARENA_SCALE. Declared here because both the menu
+ * preview and the fight scene size their models with it. */
+const RING_SIZE = 8;
+const ARENA_SCALE = (RING_SIZE / 2) / window.ARENA.RING.ropeHalf;
+
 /* ----- MENU BACKGROUND PREVIEW ----- */
 let previewCharIdx = 0;
 (function previewScene(){
@@ -1307,7 +1272,9 @@ let previewCharIdx = 0;
     fighter.rotation.y = sway*0.3;
     // Sway the shoulders only -- rotating every child swung the legs about their centres
     // and pushed the feet through the mat.
-    fighter.userData.shoulders.forEach(s => { s.rotation.x = Math.sin(t*1.5)*0.1; });
+    // TEMPORARY (step 2 of the model swap): the boxer exposes userData.bones, not .shoulders.
+    // Retargeted in the next commit; skip the sway rather than throw until then.
+    (fighter.userData.shoulders || []).forEach(s => { s.rotation.x = Math.sin(t*1.5)*0.1; });
 
     renderer.render(scene,camera);
   }
@@ -1345,8 +1312,6 @@ resizeFight();
 /* Lighting is the arena's own rig, built in buildArenaLighting() once ARENA_SCALE is known. */
 let tunnelLight = null, tunnelBaseIntensity = 0;
 
-const RING_SIZE = 8;
-
 /* ----- VOXEL ARENA -----
  * The gym, ring and stands come from src/arena, which is authored in its own much larger units:
  * the rope line sits at +/-RING.ropeHalf and the gym floor at y=0. Scale the whole build so the
@@ -1355,7 +1320,6 @@ const RING_SIZE = 8;
  * call scene.add(), so a Group stands in for the scene and lets the arena be transformed as one
  * without editing the copied modules. */
 let arenaModel = null;
-let ARENA_SCALE = 1;
 
 /* The arena is scaled by ARENA_SCALE and spun 180 degrees about Y, so world x/z are the arena's
  * negated and scaled. Everything the arena exports (RING, GYM, standHeightAt) is in arena units,
@@ -1419,7 +1383,6 @@ function buildArena(){
   buildGym(arena);
   buildRing(arena);
   buildStands(arena);
-  ARENA_SCALE = (RING_SIZE / 2) / RING.ropeHalf;
   arena.scale.setScalar(ARENA_SCALE);
   arena.rotation.y = Math.PI;
   arenaModel = arena;
@@ -1635,65 +1598,14 @@ function toggleOrbit(){
 
 /* ----- FIGHTER FACTORY ----- */
 function createFighter(charData, side){
-  const group = new THREE.Group();
-  const skin = 0xc79a73;
-  const mat = new THREE.MeshStandardMaterial({color:charData.color, roughness:0.5, metalness:0.15});
-  const darkMat = new THREE.MeshStandardMaterial({color:charData.dark, roughness:0.6});
-  const skinMat = new THREE.MeshStandardMaterial({color:skin, roughness:0.7});
+  // The model is the arena's voxel boxer, chosen by characterMap. The character keeps its own
+  // stats, name, record and specials -- only the body it wears comes from here. The boxers are
+  // authored at arena scale, so the whole rig is brought into the game's units the same way the
+  // arena itself is.
+  const group = window.CHARACTER_MAP.buildCharacterModel(charData.name);
+  group.scale.multiplyScalar(ARENA_SCALE);
+  const bones = group.userData.bones;
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62,0.75,0.36), mat);
-  torso.position.y = 1.28;
-  group.add(torso);
-
-  const hips = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,0.34), darkMat);
-  hips.position.y = 0.86;
-  group.add(hips);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22,12,12), skinMat);
-  head.position.y = 1.86;
-  group.add(head);
-
-  function makeArm(sign){
-    const shoulder = new THREE.Group();
-    shoulder.position.set(sign*0.42, 1.58, 0);
-    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.42,0.19), skinMat);
-    upper.position.y = -0.21;
-    shoulder.add(upper);
-    const elbow = new THREE.Group();
-    elbow.position.y = -0.42;
-    upper.add(elbow);
-    const fore = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.4,0.17), skinMat);
-    fore.position.y=-0.2;
-    elbow.add(fore);
-    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), darkMat);
-    glove.position.y=-0.42;
-    fore.add(glove);
-    return {shoulder, elbow};
-  }
-  const rightArm = makeArm(-1);
-  const leftArm  = makeArm(1);
-  group.add(rightArm.shoulder, leftArm.shoulder);
-
-  function makeLeg(sign){
-    const hip = new THREE.Group();
-    hip.position.set(sign*0.16, 0.86, 0);
-    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.46,0.22), darkMat);
-    upper.position.y=-0.23;
-    hip.add(upper);
-    const knee = new THREE.Group();
-    knee.position.y=-0.46;
-    upper.add(knee);
-    const lower = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.44,0.2), skinMat);
-    lower.position.y=-0.22;
-    knee.add(lower);
-    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.14,0.28), darkMat);
-    boot.position.y=-0.44;
-    lower.add(boot);
-    return {hip, knee};
-  }
-  const rightLeg = makeLeg(-1);
-  const leftLeg  = makeLeg(1);
-  group.add(rightLeg.hip, leftLeg.hip);
 
   // Distance from the group origin down to the soles. The rig hangs its legs off the hip
   // group, so in the rest pose the boots bottom out well below y=0 -- placing the group at
@@ -1721,7 +1633,7 @@ function createFighter(charData, side){
   group.traverse(o => { if(o.isMesh) o.castShadow = true; });
 
   return {
-    group, torso, head, rightArm, leftArm, rightLeg, leftLeg,
+    group, bones,
     color:charData.color, name:charData.name,
     maxHp: maxHp, hp: maxHp, blocking:false,
     headMax, bodyMax, headHp: headMax, bodyHp: bodyMax,
@@ -1865,6 +1777,9 @@ function startAttack(f, type){
 function groundY(f){ return ringFloorY + f.footOffset; }
 
 function animUppercut(f, p){
+  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
+  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
+  if(!f.torso) return;
   // Dip for the first third to load the legs, then drive up and through.
   const load  = Math.min(1, p/0.35);
   const drive = Math.max(0, (p-0.35)/0.65);
@@ -1883,6 +1798,9 @@ function animUppercut(f, p){
 }
 
 function animHaymaker(f, p){
+  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
+  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
+  if(!f.torso) return;
   // Long coil, then a wide looping release over the top.
   const wind   = Math.min(1, p/0.45);
   const swingP = Math.max(0, (p-0.45)/0.55);
@@ -1899,6 +1817,9 @@ function animHaymaker(f, p){
 }
 
 function animLiverShot(f, p){
+  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
+  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
+  if(!f.torso) return;
   // Compact crouch and a short dig into the body -- no wind-up to read.
   const s = Math.sin(p*Math.PI);
   const crouch = Math.sin(Math.min(1, p/0.5)*Math.PI*0.5) * (1 - Math.max(0,(p-0.7)/0.3));
@@ -1914,6 +1835,9 @@ function animLiverShot(f, p){
 }
 
 function resetAttackPose(f){
+  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
+  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
+  if(!f.torso) return;
   f.rightArm.shoulder.rotation.set(0,0,0);
   f.leftArm.shoulder.rotation.set(0,0,0);
   f.rightArm.elbow.rotation.set(0,0,0);
@@ -2106,6 +2030,9 @@ function runEntranceSequence(){
 }
 
 function animateWalkCycle(f){
+  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
+  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
+  if(!f.torso) return;
   const s = Math.sin(f.walkPhase)*0.5;
   f.leftLeg.hip.rotation.x = s;
   f.rightLeg.hip.rotation.x = -s;
@@ -2250,15 +2177,19 @@ function updateAttackAnim(f, opponent, dt){
   const swing = Math.sin(p*Math.PI);
   const sk = SPECIAL_SKILLS[anim.type];
 
-  if(sk){
-    sk.anim(f, p);
-  } else if(anim.type==='light'){
-    f.rightArm.shoulder.rotation.x = -swing*2.1;
-    f.rightArm.elbow.rotation.x = -swing*0.5;
-  } else {
-    f.leftArm.shoulder.rotation.x = -swing*2.6;
-    f.leftArm.elbow.rotation.x = -swing*0.7;
-    f.torso.rotation.y = -f.facing*swing*0.35;
+  // TEMPORARY (step 2 of the model swap): posing is retargeted to userData.bones in the next
+  // commit. Only the pose is skipped -- the hit window, damage and KO below stay live.
+  if(f.torso){
+    if(sk){
+      sk.anim(f, p);
+    } else if(anim.type==='light'){
+      f.rightArm.shoulder.rotation.x = -swing*2.1;
+      f.rightArm.elbow.rotation.x = -swing*0.5;
+    } else {
+      f.leftArm.shoulder.rotation.x = -swing*2.6;
+      f.leftArm.elbow.rotation.x = -swing*0.7;
+      f.torso.rotation.y = -f.facing*swing*0.35;
+    }
   }
 
   const hitWindowStart = sk ? sk.hitStart : (anim.type==='light' ? 0.4 : 0.48);
@@ -2343,6 +2274,9 @@ function facePlayers(){
 }
 
 function updateWalkPose(f, moving){
+  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
+  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
+  if(!f.torso) return;
   if(f.attackAnim) return;
   if(moving){
     animateWalkCycle(f);
