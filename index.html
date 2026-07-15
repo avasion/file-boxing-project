@@ -269,6 +269,13 @@
   #loadingMsg.show, #errorMsg.show { display:flex; }
   #errorMsg { color:#ff2a34; }
 </style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"
+    }
+  }
+</script>
 </head>
 <body>
 <div id="app">
@@ -311,6 +318,41 @@
               <span class="val" id="stat-lastResult">—</span>
             </div>
           </div>
+            <div class="pageTitle" style="margin-top:12px;">SKILL POINTS & UPGRADES</div>
+            <div id="upgradesPanel" style="padding:8px;">
+              <div class="statRow">
+                <span class="label">PLAYER SKILL POINTS</span>
+                <span class="val" id="playerSkillPts">0</span>
+              </div>
+              <div class="statRow">
+                <span class="label">CPU SKILL POINTS</span>
+                <span class="val" id="cpuSkillPts">0</span>
+              </div>
+              <div style="margin-top:8px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Health</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_hp">-</button> <span id="player_hp" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_hp">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(+10 HP /pt)</span> </div>
+              </div>
+              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Stamina</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_stam">-</button> <span id="player_stam" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_stam">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(faster recovery)</span> </div>
+              </div>
+              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Energy</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_energy">-</button> <span id="player_energy" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_energy">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(improves block)</span> </div>
+              </div>
+              <div style="margin-top:6px; display:grid; grid-template-columns:1fr 80px 80px; gap:8px; align-items:center;">
+                <div style="font-size:12px; color:var(--muted);">Damage</div>
+                <div style="text-align:center;"> <button class="resultBtn" id="dec_dmg">-</button> <span id="player_dmg" style="padding:0 8px;">0</span> <button class="resultBtn" id="inc_dmg">+</button> </div>
+                <div style="text-align:center;"> <span style="font-size:11px; color:var(--muted);">(+8% damage /pt)</span> </div>
+              </div>
+              <div style="margin-top:8px; display:flex; gap:8px;">
+                <div class="resultBtn" id="resetUpgrades">RESET</div>
+                <div style="flex:1"></div>
+              </div>
+            </div>
 
           <!-- CAREER Page -->
           <div id="page-career" class="backstagePage">
@@ -476,51 +518,112 @@
 </div>
 
 <!-- LOAD THREE.JS WITH MULTI-CDN FALLBACK -->
-<!-- r147 is the last release that ships the global-script build of FBXLoader
-     (examples/js was deleted in r148), so core and loader are both pinned to it. -->
 <script>
-function loadScriptWithFallback(urls, isReady) {
-  return new Promise((resolve, reject) => {
-    (function attempt(i) {
-      if (i >= urls.length) {
-        reject(new Error('Failed to load from all CDNs: ' + urls[0]));
-        return;
-      }
-      const script = document.createElement('script');
-      script.src = urls[i];
-      script.onload = () => isReady() ? resolve() : attempt(i + 1);
-      script.onerror = () => attempt(i + 1);
-      document.head.appendChild(script);
-    })(0);
-  });
-}
+// --- Audio: preload and playback helpers ---
+window.AUDIO = (function(){
+  const sounds = {
+    menu: 'sound/Menu Music.wav',
+    REAPER: 'sound/Travis Scott - SICKO MODE (Instrumental).mp3',
+    PHOENIX: 'sound/DMX - Ruff Ryders Anthem.mp3',
+    VIPER: 'sound/Kodak Black - ZEZE.mp3',
+    SHOCKWAVE: 'sound/50 Cent - Many Men) (Instrumental).mp3'
+  };
 
-function showLoadError(message, err) {
+  const audioEls = {};
+  Object.keys(sounds).forEach(k => {
+    const src = sounds[k];
+    const a = new Audio(src);
+    a.preload = 'auto';
+    a.loop = (k === 'menu');
+    a.volume = (k === 'menu') ? 0.45 : 0.9;
+    audioEls[k] = a;
+  });
+
+  let current = null;
+  let currentTimer = null;
+
+  function stopCurrent(){
+    if(currentTimer){ clearTimeout(currentTimer); currentTimer = null; }
+    if(current){
+      try{ current.pause(); current.currentTime = 0; }catch(e){}
+      current = null;
+    }
+  }
+
+  function isPlaying(key){
+    const a = audioEls[key];
+    return !!a && !a.paused && !a.ended;
+  }
+
+  function play(key, {durationMs=null} = {}){
+    if(!audioEls[key]) return;
+    const next = audioEls[key];
+    stopCurrent();
+    current = next;
+    try{
+      next.currentTime = 0;
+      next.loop = (key === 'menu');
+      next.play();
+      if(durationMs && key !== 'menu'){
+        currentTimer = setTimeout(() => {
+          try{ next.pause(); next.currentTime = 0; }catch(e){};
+          if(current === next) current = null;
+          currentTimer = null;
+        }, durationMs);
+      }
+    }catch(e){}
+  }
+
+  function stopAll(){
+    if(currentTimer){ clearTimeout(currentTimer); currentTimer = null; }
+    Object.values(audioEls).forEach(a=>{ try{ a.pause(); a.currentTime = 0; }catch(e){} });
+    current = null;
+  }
+
+  return { play, stopAll, isPlaying, audioEls };
+})();
+</script>
+<script>
+window.THREE_LOAD_PROMISE = new Promise((resolve, reject) => {
+  const cdns = [
+    'https://unpkg.com/three@0.150.1/build/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js'
+  ];
+  
+  function attemptLoad(index) {
+    if (index >= cdns.length) {
+      reject(new Error('Failed to load THREE.js from all CDNs'));
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = cdns[index];
+    script.onload = () => resolve(window.THREE);
+    script.onerror = () => attemptLoad(index + 1);
+    document.head.appendChild(script);
+  }
+  
+  attemptLoad(0);
+}).catch(err => {
   document.getElementById('loadingMsg').classList.remove('show');
   document.getElementById('errorMsg').classList.add('show');
-  document.getElementById('errorMsg').textContent = message;
-  console.error(message, err);
+  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load THREE.js. Check your internet connection.';
+  console.error('THREE.js loading failed:', err);
   throw err;
-}
-
-window.THREE_LOAD_PROMISE = loadScriptWithFallback([
-  'https://unpkg.com/three@0.147.0/build/three.min.js',
-  'https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.147.0/three.min.js'
-], () => !!window.THREE).catch(err => {
-  showLoadError('ERROR: Failed to load THREE.js. Check your internet connection.', err);
 });
 
-// fflate must be present before FBXLoader parses a binary FBX: 7.4 files store
-// their vertex/index arrays zlib-deflated, and the loader throws without it.
-window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => loadScriptWithFallback([
-  'https://unpkg.com/three@0.147.0/examples/js/libs/fflate.min.js',
-  'https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/libs/fflate.min.js'
-], () => typeof fflate !== 'undefined')).then(() => loadScriptWithFallback([
-  'https://unpkg.com/three@0.147.0/examples/js/loaders/FBXLoader.js',
-  'https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/FBXLoader.js'
-], () => !!(window.THREE && THREE.FBXLoader))).catch(err => {
-  showLoadError('ERROR: Failed to load FBXLoader. Check your internet connection.', err);
+window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => {
+  return import('https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/FBXLoader.js')
+    .then(module => {
+      window.THREE.FBXLoader = module.FBXLoader;
+    });
+}).catch(err => {
+  document.getElementById('loadingMsg').classList.remove('show');
+  document.getElementById('errorMsg').classList.add('show');
+  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load FBXLoader. Check your internet connection.';
+  console.error('FBXLoader loading failed:', err);
+  throw err;
 });
 </script>
 
@@ -532,6 +635,11 @@ window.FBX_LOADER_PROMISE.then(() => {
 }).catch(() => {});
 
 function initializeGame() {
+  function ensureMenuMusic(){
+    try{ if(window.AUDIO) window.AUDIO.play('menu'); }catch(e){} }
+  ensureMenuMusic();
+  window.addEventListener('pointerdown', ensureMenuMusic, { once: true });
+  window.addEventListener('keydown', ensureMenuMusic, { once: true });
 
 const CHARACTERS = [
   { name:'BLAZE',     color:0x2196f3, dark:0x0d3a63, overall:92 },
@@ -560,6 +668,67 @@ let careerStats = {
   lastResult: '—',
   recentMatches: []
 };
+
+/* ----- SKILL POINTS / UPGRADES ----- */
+let playerSkillPts = 0;
+let cpuSkillPts = 0;
+const playerUpgrades = { hp:0, stamina:0, energy:0, damage:0 };
+const cpuUpgrades = { hp:0, stamina:0, energy:0, damage:0 };
+
+function loadUpgrades(){
+  try{
+    const s = localStorage.getItem('boxing_upgrades');
+    if(s){
+      const obj = JSON.parse(s);
+      Object.assign(playerUpgrades, obj.playerUpgrades||{});
+      Object.assign(cpuUpgrades, obj.cpuUpgrades||{});
+      playerSkillPts = obj.playerSkillPts||0;
+      cpuSkillPts = obj.cpuSkillPts||0;
+    }
+  }catch(e){}
+}
+function saveUpgrades(){
+  try{ localStorage.setItem('boxing_upgrades', JSON.stringify({ playerUpgrades, cpuUpgrades, playerSkillPts, cpuSkillPts })); }catch(e){}
+}
+
+function updateUpgradesUI(){
+  document.getElementById('playerSkillPts').textContent = playerSkillPts;
+  document.getElementById('cpuSkillPts').textContent = cpuSkillPts;
+  document.getElementById('player_hp').textContent = playerUpgrades.hp;
+  document.getElementById('player_stam').textContent = playerUpgrades.stamina;
+  document.getElementById('player_energy').textContent = playerUpgrades.energy;
+  document.getElementById('player_dmg').textContent = playerUpgrades.damage;
+}
+
+function allocateUpgrade(target, stat, delta){
+  const up = target==='player' ? playerUpgrades : cpuUpgrades;
+  const pts = target==='player' ? () => playerSkillPts : () => cpuSkillPts;
+  if(delta>0){
+    if((target==='player'?playerSkillPts:cpuSkillPts) <= 0) return;
+    up[stat] = (up[stat]||0) + delta;
+    if(target==='player') playerSkillPts -= delta; else cpuSkillPts -= delta;
+  }else{
+    if((up[stat]||0) <= 0) return;
+    up[stat] = Math.max(0, up[stat] + delta);
+    if(target==='player') playerSkillPts -= delta; else cpuSkillPts -= delta; // delta is negative -> add back
+  }
+  saveUpgrades(); updateUpgradesUI();
+}
+
+function autoAllocateCpu(){
+  // simple even distribution across stats when cpu gains points
+  const order = ['hp','damage','stamina','energy'];
+  while(cpuSkillPts>0){
+    for(const s of order){
+      if(cpuSkillPts<=0) break;
+      cpuUpgrades[s] = (cpuUpgrades[s]||0)+1;
+      cpuSkillPts--;
+    }
+  }
+  saveUpgrades(); updateUpgradesUI();
+}
+
+loadUpgrades();
 
 /* ----- MENU PAGE SWITCHER ----- */
 const menuItems = document.querySelectorAll('#mainMenuList li');
@@ -605,10 +774,15 @@ function updateCareerStats(winner, loser, isKO){
     careerStats.currentStreak++;
     if(isKO) careerStats.totalKOs++;
     careerStats.lastResult = 'WIN';
+    // award skill points to player
+    playerSkillPts += 5;
   } else {
     careerStats.losses++;
     careerStats.currentStreak = 0;
     careerStats.lastResult = 'LOSS';
+    // award skill points to CPU and auto allocate
+    cpuSkillPts += 5;
+    autoAllocateCpu();
   }
   
   careerStats.recentMatches.unshift({
@@ -620,6 +794,7 @@ function updateCareerStats(winner, loser, isKO){
   if(careerStats.recentMatches.length > 5) careerStats.recentMatches.pop();
 
   updateStatsUI();
+  updateUpgradesUI();
 }
 
 function updateStatsUI(){
@@ -756,6 +931,22 @@ document.getElementById('entranceToggle').addEventListener('click',(e)=>{
 // Initialize roster and stats on load
 initRoster();
 updateStatsUI();
+ updateUpgradesUI();
+
+// Upgrade button handlers
+document.getElementById('inc_hp').addEventListener('click', ()=> allocateUpgrade('player','hp',1));
+document.getElementById('dec_hp').addEventListener('click', ()=> allocateUpgrade('player','hp',-1));
+document.getElementById('inc_stam').addEventListener('click', ()=> allocateUpgrade('player','stamina',1));
+document.getElementById('dec_stam').addEventListener('click', ()=> allocateUpgrade('player','stamina',-1));
+document.getElementById('inc_energy').addEventListener('click', ()=> allocateUpgrade('player','energy',1));
+document.getElementById('dec_energy').addEventListener('click', ()=> allocateUpgrade('player','energy',-1));
+document.getElementById('inc_dmg').addEventListener('click', ()=> allocateUpgrade('player','damage',1));
+document.getElementById('dec_dmg').addEventListener('click', ()=> allocateUpgrade('player','damage',-1));
+document.getElementById('resetUpgrades').addEventListener('click', ()=>{
+  playerSkillPts += (playerUpgrades.hp + playerUpgrades.stamina + playerUpgrades.energy + playerUpgrades.damage);
+  playerUpgrades.hp = playerUpgrades.stamina = playerUpgrades.energy = playerUpgrades.damage = 0;
+  saveUpgrades(); updateUpgradesUI(); updateStatsUI();
+});
 
 document.getElementById('startMatchBtn').addEventListener('click', ()=>{
   if(picks.p1===null||picks.p2===null) return;
@@ -923,7 +1114,7 @@ function loadArenaModel(){
 }
 
 /* ----- FIGHTER FACTORY ----- */
-function createFighter(charData){
+function createFighter(charData, side){
   const group = new THREE.Group();
   const skin = 0xc79a73;
   const mat = new THREE.MeshStandardMaterial({color:charData.color, roughness:0.5, metalness:0.15});
@@ -984,10 +1175,18 @@ function createFighter(charData){
   const leftLeg  = makeLeg(1);
   group.add(rightLeg.hip, leftLeg.hip);
 
+  const up = (side==='player') ? playerUpgrades : cpuUpgrades;
+  const maxHp = 100 + (up.hp||0) * 10;
+  const damageMul = 1 + (up.damage||0) * 0.08;
+  const stamina = (up.stamina||0) * 0.12; // affects attack speed / cooldown
+  const energy = (up.energy||0) * 0.12;   // affects block effectiveness
+  const blockReduction = Math.max(0.08, 0.22 - (up.energy||0) * 0.03);
+
   return {
     group, torso, head, rightArm, leftArm, rightLeg, leftLeg,
     color:charData.color, name:charData.name,
-    hp:100, blocking:false,
+    maxHp: maxHp, hp: maxHp, blocking:false,
+    damageMul: damageMul, stamina: stamina, energy: energy, blockReduction: blockReduction,
     attackAnim:null,
     walkPhase:0,
     facing:1,
@@ -1025,11 +1224,14 @@ function handleAttackKey(code){
 
 function startAttack(f, type){
   if(f.attackAnim || f.ko) return;
-  f.attackAnim = { type, t:0, hit:false, dur: type==='light'?0.3:0.55 };
+  const baseDur = type==='light'?0.3:0.55;
+  const dur = baseDur * Math.max(0.6, 1 - (f.stamina||0)*0.45);
+  f.attackAnim = { type, t:0, hit:false, dur };
 }
 
 /* ----- ENTRANCE SEQUENCE ----- */
 function startMatch(){
+  try{ if(window.AUDIO) window.AUDIO.stopAll(); }catch(e){}
   matchDuration = timeOptions[timeIdx];
   timeLeft = matchDuration;
   matchOver = false;
@@ -1039,16 +1241,16 @@ function startMatch(){
   if(p1F) fScene.remove(p1F.group);
   if(p2F) fScene.remove(p2F.group);
 
-  p1F = createFighter(CHARACTERS[picks.p1]);
-  p2F = createFighter(CHARACTERS[picks.p2]);
+  p1F = createFighter(CHARACTERS[picks.p1], 'player');
+  p2F = createFighter(CHARACTERS[picks.p2], 'cpu');
   fScene.add(p1F.group, p2F.group);
 
   document.getElementById('p1Name').textContent = p1F.name;
   document.getElementById('p2Name').textContent = p2F.name + ' (CPU)';
-  document.getElementById('p1Pct').textContent = 100;
-  document.getElementById('p2Pct').textContent = 100;
-  document.getElementById('p1Fill').style.width='100%';
-  document.getElementById('p2Fill').style.width='100%';
+  document.getElementById('p1Pct').textContent = Math.ceil(p1F.hp);
+  document.getElementById('p2Pct').textContent = Math.ceil(p2F.hp);
+  document.getElementById('p1Fill').style.width = Math.min(100, Math.round((p1F.hp / p1F.maxHp)*100)) + '%';
+  document.getElementById('p2Fill').style.width = Math.min(100, Math.round((p2F.hp / p2F.maxHp)*100)) + '%';
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('controlsHint').classList.add('hidden');
   document.getElementById('resultScreen').style.display='none';
@@ -1117,6 +1319,10 @@ function runEntranceSequence(){
   }
 
   async function walkOn(fighter, label){
+    try{
+      const key = (fighter.name||'').toUpperCase();
+      if(window.AUDIO) window.AUDIO.play(key, { durationMs: 6400 });
+    }catch(e){}
     nowEl.style.opacity=0;
     whoEl.style.opacity=0;
     whoEl.textContent = label;
@@ -1211,6 +1417,7 @@ function beginFight(){
   fCamera.position.set(0,3.6,9.5);
   fCamera.lookAt(0,1.4,0);
   showBigText('FIGHT!',1200);
+  try{ if(window.AUDIO) window.AUDIO.stopAll(); }catch(e){}
   fightActive = true;
   clock.getDelta();
 }
@@ -1301,7 +1508,9 @@ function updateCPU(cpu, player, dt){
   if(dist < 1.7 && cpuState.attackCooldown <= 0 && !cpu.attackAnim){
     const type = Math.random() < 0.72 ? 'light' : 'heavy';
     startAttack(cpu, type);
-    cpuState.attackCooldown = type==='heavy' ? (1.1+Math.random()*0.8) : (0.55+Math.random()*0.55);
+    const baseCd = type==='heavy' ? (1.1+Math.random()*0.8) : (0.55+Math.random()*0.55);
+    const mod = Math.max(0.5, 1 - (cpu.stamina||0) * 0.06);
+    cpuState.attackCooldown = baseCd * mod;
   }
 
   return moving;
@@ -1325,13 +1534,14 @@ function updateAttackAnim(f, opponent, dt){
 
   const hitWindowStart = anim.type==='light' ? 0.4 : 0.48;
   const hitWindowEnd   = anim.type==='light' ? 0.6 : 0.68;
-  if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
+    if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
     const dist = f.group.position.distanceTo(opponent.group.position);
     const range = anim.type==='light' ? 1.45 : 1.75;
     if(dist < range){
       anim.hit = true;
-      let dmg = anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8);
-      if(opponent.blocking) dmg *= 0.22;
+      let dmgBase = anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8);
+      let dmg = dmgBase * (f.damageMul||1);
+      if(opponent.blocking) dmg *= (opponent.blockReduction||0.22);
       opponent.hp = Math.max(0, opponent.hp - dmg);
       flashHit(opponent);
       updateHpUI();
@@ -1367,8 +1577,10 @@ function flashHit(f){
 function updateHpUI(){
   document.getElementById('p1Pct').textContent = Math.ceil(p1F.hp);
   document.getElementById('p2Pct').textContent = Math.ceil(p2F.hp);
-  document.getElementById('p1Fill').style.width = p1F.hp+'%';
-  document.getElementById('p2Fill').style.width = p2F.hp+'%';
+  const p1pct = Math.max(0, Math.min(100, (p1F.hp / (p1F.maxHp||100)) * 100));
+  const p2pct = Math.max(0, Math.min(100, (p2F.hp / (p2F.maxHp||100)) * 100));
+  document.getElementById('p1Fill').style.width = p1pct + '%';
+  document.getElementById('p2Fill').style.width = p2pct + '%';
 }
 
 function facePlayers(){
