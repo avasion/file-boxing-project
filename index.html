@@ -476,48 +476,51 @@
 </div>
 
 <!-- LOAD THREE.JS WITH MULTI-CDN FALLBACK -->
+<!-- r147 is the last release that ships the global-script build of FBXLoader
+     (examples/js was deleted in r148), so core and loader are both pinned to it. -->
 <script>
-window.THREE_LOAD_PROMISE = new Promise((resolve, reject) => {
-  const cdns = [
-    'https://unpkg.com/three@0.150.1/build/three.min.js',
-    'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js'
-  ];
-  
-  function attemptLoad(index) {
-    if (index >= cdns.length) {
-      reject(new Error('Failed to load THREE.js from all CDNs'));
-      return;
-    }
-    
-    const script = document.createElement('script');
-    script.src = cdns[index];
-    script.onload = () => resolve(window.THREE);
-    script.onerror = () => attemptLoad(index + 1);
-    document.head.appendChild(script);
-  }
-  
-  attemptLoad(0);
-}).catch(err => {
+function loadScriptWithFallback(urls, isReady) {
+  return new Promise((resolve, reject) => {
+    (function attempt(i) {
+      if (i >= urls.length) {
+        reject(new Error('Failed to load from all CDNs: ' + urls[0]));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = urls[i];
+      script.onload = () => isReady() ? resolve() : attempt(i + 1);
+      script.onerror = () => attempt(i + 1);
+      document.head.appendChild(script);
+    })(0);
+  });
+}
+
+function showLoadError(message, err) {
   document.getElementById('loadingMsg').classList.remove('show');
   document.getElementById('errorMsg').classList.add('show');
-  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load THREE.js. Check your internet connection.';
-  console.error('THREE.js loading failed:', err);
+  document.getElementById('errorMsg').textContent = message;
+  console.error(message, err);
   throw err;
+}
+
+window.THREE_LOAD_PROMISE = loadScriptWithFallback([
+  'https://unpkg.com/three@0.147.0/build/three.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.147.0/three.min.js'
+], () => !!window.THREE).catch(err => {
+  showLoadError('ERROR: Failed to load THREE.js. Check your internet connection.', err);
 });
 
-window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => new Promise((resolve, reject) => {
-  const loaderScript = document.createElement('script');
-  loaderScript.src = 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/FBXLoader.js';
-  loaderScript.onload = resolve;
-  loaderScript.onerror = () => reject(new Error('Failed to load FBXLoader'));
-  document.head.appendChild(loaderScript);
-})).catch(err => {
-  document.getElementById('loadingMsg').classList.remove('show');
-  document.getElementById('errorMsg').classList.add('show');
-  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load FBXLoader. Check your internet connection.';
-  console.error('FBXLoader loading failed:', err);
-  throw err;
+// fflate must be present before FBXLoader parses a binary FBX: 7.4 files store
+// their vertex/index arrays zlib-deflated, and the loader throws without it.
+window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => loadScriptWithFallback([
+  'https://unpkg.com/three@0.147.0/examples/js/libs/fflate.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/libs/fflate.min.js'
+], () => typeof fflate !== 'undefined')).then(() => loadScriptWithFallback([
+  'https://unpkg.com/three@0.147.0/examples/js/loaders/FBXLoader.js',
+  'https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/FBXLoader.js'
+], () => !!(window.THREE && THREE.FBXLoader))).catch(err => {
+  showLoadError('ERROR: Failed to load FBXLoader. Check your internet connection.', err);
 });
 </script>
 
@@ -895,9 +898,21 @@ function loadArenaModel(){
         child.receiveShadow = true;
       }
     });
-    object.scale.setScalar(0.07);
     object.rotation.y = Math.PI;
-    object.position.set(0, 0, 0);
+
+    // The FBX is authored ~1850 units across, so fit its width to RING_SIZE rather than
+    // guessing a factor: the ropes then land on +/-RING_SIZE/2, just outside BOUND, and the
+    // ring stays well inside fScene.fog's far plane. Measure after the rotation is applied.
+    object.updateMatrixWorld(true);
+    const rawSize = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
+    object.scale.setScalar(RING_SIZE / rawSize.x);
+
+    // Re-measure at the fitted scale to centre the ring on the fighters and sit it on the floor.
+    object.updateMatrixWorld(true);
+    const fitted = new THREE.Box3().setFromObject(object);
+    const centre = fitted.getCenter(new THREE.Vector3());
+    object.position.set(-centre.x, -fitted.min.y, -centre.z);
+
     arenaModel = object;
     fScene.add(arenaModel);
   }, undefined, err => {
