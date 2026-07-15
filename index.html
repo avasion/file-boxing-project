@@ -828,11 +828,26 @@ window.AUDIO = (function(){
 <!-- MAIN GAME CODE (initializeGame is called by the module loader above) -->
 <script>
 function initializeGame() {
+  /* The menu track belongs to the menu, and only to the menu. These listeners exist because a
+   * browser will not start audio until the first user gesture -- but that gesture can land
+   * anywhere, and the first key a player ever presses is usually WASD out in explore or the ENTER
+   * that starts the round, long after they left the menu with a mouse. Firing there took the
+   * channel off the walkout track, which the entrance then restarted on its short clip: hence
+   * walkout, menu music, walkout again. So it retries on every gesture rather than only the first,
+   * and does nothing unless the menu is actually up and the track is not already running. */
+  function menuIsUp(){
+    const m = document.getElementById('menuScreen');
+    return !!m && m.style.display !== 'none';
+  }
   function ensureMenuMusic(){
-    try{ if(window.AUDIO) window.AUDIO.play('menu'); }catch(e){} }
+    if(!menuIsUp()) return;
+    try{
+      if(window.AUDIO && !window.AUDIO.isPlaying('menu')) window.AUDIO.play('menu');
+    }catch(e){}
+  }
   ensureMenuMusic();
-  window.addEventListener('pointerdown', ensureMenuMusic, { once: true });
-  window.addEventListener('keydown', ensureMenuMusic, { once: true });
+  window.addEventListener('pointerdown', ensureMenuMusic);
+  window.addEventListener('keydown', ensureMenuMusic);
 
 const CHARACTERS = [
   { name:'BLAZE',     color:0x2196f3, dark:0x0d3a63, overall:92 },
