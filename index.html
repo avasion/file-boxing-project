@@ -668,23 +668,47 @@
 <script>
 // --- Audio: preload and playback helpers ---
 window.AUDIO = (function(){
+  // startAt trims the dead space each file opens with, so a walkout starts on the music rather
+  // than on silence. Measured off the decoded waveform as the first sample above -60 dBFS:
+  // SICKO 0.153s, Ruff Ryders 0.130s, ZEZE 0.384s, Many Men 0.181s; the wavs open on their first
+  // sample. Re-measure if a file is replaced.
   const sounds = {
-    menu: 'sound/Menu Music.wav',
-    REAPER: 'sound/Travis Scott - SICKO MODE (Instrumental).mp3',
-    PHOENIX: 'sound/DMX - Ruff Ryders Anthem.mp3',
-    VIPER: 'sound/Kodak Black - ZEZE.mp3',
-    SHOCKWAVE: 'sound/50 Cent - Many Men) (Instrumental).mp3'
+    menu:      { src:'sound/Menu Music.wav', startAt:0 },
+    REAPER:    { src:'sound/Travis Scott - SICKO MODE (Instrumental).mp3', startAt:0.153 },
+    PHOENIX:   { src:'sound/DMX - Ruff Ryders Anthem.mp3', startAt:0.130 },
+    VIPER:     { src:'sound/Kodak Black - ZEZE.mp3', startAt:0.384 },
+    SHOCKWAVE: { src:'sound/50 Cent - Many Men) (Instrumental).mp3', startAt:0.181 }
   };
 
   const audioEls = {};
   Object.keys(sounds).forEach(k => {
-    const src = sounds[k];
-    const a = new Audio(src);
+    const a = new Audio(sounds[k].src);
     a.preload = 'auto';
     a.loop = (k === 'menu');
     a.volume = (k === 'menu') ? 0.45 : 0.9;
     audioEls[k] = a;
+    seekToStart(a, sounds[k].startAt);   // park on the music ahead of the first walkout
   });
+
+  /* Park an element on the first bar of its music. A seek needs data behind it -- with only
+     metadata loaded the media is not seekable yet and the seek silently resolves to 0, putting the
+     dead space straight back -- so wait for canplay if it is not ready. Seeking also needs the host
+     to serve byte ranges; every static host does, but a dev server may not, in which case the
+     track simply starts from 0 as before. */
+  function seekToStart(el, startAt){
+    if(!startAt) return;
+    const apply = () => { try{ el.currentTime = startAt; }catch(e){} };
+    if(el.readyState >= 3) apply();
+    else el.addEventListener('canplay', apply, { once:true });
+  }
+
+  /* The crowd is its own channel: it runs underneath the round rather than taking the one slot the
+     walkout tracks share, and its gain rides the crowd's excitement. */
+  const CROWD_BASE = 0.30, CROWD_PEAK = 0.62;
+  const crowdEl = new Audio('sound/Crowd sounds.wav');
+  crowdEl.preload = 'auto';
+  crowdEl.loop = true;
+  crowdEl.volume = CROWD_BASE;
 
   let current = null;
   let currentTimer = null;
@@ -692,7 +716,7 @@ window.AUDIO = (function(){
   function stopCurrent(){
     if(currentTimer){ clearTimeout(currentTimer); currentTimer = null; }
     if(current){
-      try{ current.pause(); current.currentTime = 0; }catch(e){}
+      try{ current.pause(); seekToStart(current, startOf(current)); }catch(e){}
       current = null;
     }
   }
@@ -708,12 +732,12 @@ window.AUDIO = (function(){
     stopCurrent();
     current = next;
     try{
-      next.currentTime = 0;
+      seekToStart(next, sounds[key].startAt);   // skip the file's dead space
       next.loop = (key === 'menu');
       next.play();
       if(durationMs && key !== 'menu'){
         currentTimer = setTimeout(() => {
-          try{ next.pause(); next.currentTime = 0; }catch(e){};
+          try{ next.pause(); seekToStart(next, sounds[key].startAt); }catch(e){};
           if(current === next) current = null;
           currentTimer = null;
         }, durationMs);
@@ -721,13 +745,33 @@ window.AUDIO = (function(){
     }catch(e){}
   }
 
+  /** Where a given element's audio actually starts, so a reset lands on the music. */
+  function startOf(el){
+    const key = Object.keys(audioEls).find(k => audioEls[k] === el);
+    return (key && sounds[key].startAt) || 0;
+  }
+
   function stopAll(){
     if(currentTimer){ clearTimeout(currentTimer); currentTimer = null; }
-    Object.values(audioEls).forEach(a=>{ try{ a.pause(); a.currentTime = 0; }catch(e){} });
+    Object.values(audioEls).forEach(a=>{ try{ a.pause(); seekToStart(a, startOf(a)); }catch(e){} });
+    stopCrowd();
     current = null;
   }
 
-  return { play, stopAll, isPlaying, audioEls };
+  /* ----- crowd bed ----- */
+  function playCrowd(){
+    try{ if(crowdEl.paused){ crowdEl.currentTime = 0; crowdEl.play(); } }catch(e){}
+  }
+  function stopCrowd(){
+    try{ crowdEl.pause(); crowdEl.currentTime = 0; }catch(e){}
+  }
+  /** excitement 0..1 — lifts the crowd over the round without drowning the hits. */
+  function setCrowdLevel(x){
+    const k = Math.max(0, Math.min(1, x));
+    crowdEl.volume = CROWD_BASE + (CROWD_PEAK - CROWD_BASE) * k;
+  }
+
+  return { play, stopAll, isPlaying, audioEls, crowdEl, playCrowd, stopCrowd, setCrowdLevel };
 })();
 </script>
 <!-- Loads THREE and the voxel arena modules from src/arena. The arena modules import 'three'
@@ -1417,6 +1461,30 @@ let tunnelLight = null, tunnelBaseIntensity = 0;
  * without editing the copied modules. */
 let arenaModel = null;
 
+/* ----- CROWD -----
+ * buildStands hands back an updater for its instanced spectators -- bobbing bodies, waving
+ * superfans -- driven by a clock it takes as an argument. Rather than feed it wall time, feed it a
+ * clock that runs faster the more excited the crowd is: a landed shot bumps the energy and it
+ * bleeds off, so the stands lift on a hit and settle between exchanges. The same energy rides the
+ * crowd's volume. Reactive without touching stands.js, which only exports update(t). */
+let arenaCrowd = null;
+let crowdEnergy = 0;      // 0..1
+let crowdClock = 0;       // the crowd's own time, not the scene's
+const CROWD_IDLE_RATE = 1.0, CROWD_HOT_RATE = 2.4;
+const CROWD_DECAY = 0.55; // per second back towards calm
+
+function bumpCrowd(amount){
+  crowdEnergy = Math.min(1, crowdEnergy + amount);
+}
+
+function updateCrowd(dt){
+  if(!arenaCrowd) return;
+  crowdEnergy = Math.max(0, crowdEnergy - CROWD_DECAY * dt);
+  crowdClock += dt * (CROWD_IDLE_RATE + (CROWD_HOT_RATE - CROWD_IDLE_RATE) * crowdEnergy);
+  arenaCrowd.update(crowdClock);
+  if(window.AUDIO) window.AUDIO.setCrowdLevel(crowdEnergy);
+}
+
 /* The arena is scaled by ARENA_SCALE and spun 180 degrees about Y, so world x/z are the arena's
  * negated and scaled. Everything the arena exports (RING, GYM, standHeightAt) is in arena units,
  * so explore-mode collision converts into that space rather than duplicating the numbers here. */
@@ -1478,7 +1546,7 @@ function buildArena(){
   const arena = new THREE.Group();
   buildGym(arena);
   buildRing(arena);
-  buildStands(arena);
+  arenaCrowd = buildStands(arena);
   arena.scale.setScalar(ARENA_SCALE);
   arena.rotation.y = Math.PI;
   arenaModel = arena;
@@ -2087,7 +2155,9 @@ function beginFight(){
   fCamera.position.copy(fightCamPos());
   fCamera.lookAt(fightCamTarget());
   showBigText('FIGHT!',1200);
-  try{ if(window.AUDIO) window.AUDIO.stopAll(); }catch(e){}
+  // stopAll cuts the walkout track and the bed; bring the bed back up under the round.
+  try{ if(window.AUDIO){ window.AUDIO.stopAll(); window.AUDIO.playCrowd(); } }catch(e){}
+  crowdEnergy = 0.35;   // the bell gets a pop
   fightActive = true;
   clock.getDelta();
 }
@@ -2227,6 +2297,8 @@ function updateAttackAnim(f, opponent, dt){
       if(f === p1F) careerStats.totalDamageDealt += dmg;
 
       if(sk) showBigText(sk.name+'!', 700);
+      // The stands react to what lands, scaled by how big the shot was.
+      bumpCrowd(Math.min(0.5, 0.12 + dmgBase * 0.012));
       flashHit(opponent);
       updateHpUI();
       if(opponent.hp<=0 && !matchOver){
@@ -2307,6 +2379,7 @@ function triggerKO(loser, winner){
   matchOver = true;
   fightActive = false;
   loser.ko = true;
+  bumpCrowd(1);         // the house comes up on a knockout
   updateCareerStats(winner, loser, true);
   showBigText('KNOCKOUT!',1600);
   const winnerLabel = winner===p1F ? p1F.name : p2F.name+' (CPU)';
@@ -2333,6 +2406,7 @@ function endByDecision(){
 }
 
 function showResult(winnerName, sub){
+  try{ if(window.AUDIO) window.AUDIO.stopCrowd(); }catch(e){}
   document.getElementById('resultTitle').textContent = winnerName==='DRAW' ? 'DRAW' : 'VICTORY';
   document.getElementById('resultSub').textContent = sub;
   document.getElementById('resultWinner').textContent = winnerName==='DRAW' ? '' : winnerName;
@@ -2366,6 +2440,7 @@ function fightLoop(){
   // a clip already in flight when the bell goes still has to finish back into the guard.
   if(p1F && p1F.anim) p1F.anim.update(dt);
   if(p2F && p2F.anim) p2F.anim.update(dt);
+  updateCrowd(dt);
 
   // Explore mode drives the camera itself; it only ever runs before the bell.
   if(viewMode === 'fps' && fpsControls && fpsControls.isLocked) moveExplore(dt);
