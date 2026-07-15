@@ -326,7 +326,8 @@
 <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
     }
   }
 </script>
@@ -653,57 +654,39 @@ window.AUDIO = (function(){
   return { play, stopAll, isPlaying, audioEls };
 })();
 </script>
-<script>
-window.THREE_LOAD_PROMISE = new Promise((resolve, reject) => {
-  const cdns = [
-    'https://unpkg.com/three@0.150.1/build/three.min.js',
-    'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r150/three.min.js'
-  ];
-  
-  function attemptLoad(index) {
-    if (index >= cdns.length) {
-      reject(new Error('Failed to load THREE.js from all CDNs'));
-      return;
-    }
-    
-    const script = document.createElement('script');
-    script.src = cdns[index];
-    script.onload = () => resolve(window.THREE);
-    script.onerror = () => attemptLoad(index + 1);
-    document.head.appendChild(script);
+<!-- Loads THREE and the voxel arena modules from src/arena. The arena modules import 'three'
+     themselves, so the game shares that one module instance as window.THREE rather than also
+     pulling the standalone build -- two copies of three in one scene do not mix. Module scripts
+     are deferred, so this runs after the classic script below has defined initializeGame(). -->
+<script type="module">
+(async () => {
+  try {
+    const [THREE, gym, ring, stands] = await Promise.all([
+      import('three'),
+      import('./src/arena/gym.js'),
+      import('./src/arena/ring.js'),
+      import('./src/arena/stands.js'),
+    ]);
+    window.THREE = THREE;
+    window.ARENA = {
+      buildGym: gym.buildGym,
+      buildRing: ring.buildRing,
+      buildStands: stands.buildStands,
+      RING: ring.RING,
+    };
+    document.getElementById('loadingMsg').classList.remove('show');
+    initializeGame();
+  } catch (err) {
+    document.getElementById('loadingMsg').classList.remove('show');
+    document.getElementById('errorMsg').classList.add('show');
+    document.getElementById('errorMsg').textContent = 'ERROR: Failed to load the arena. Check your internet connection.';
+    console.error('Arena loading failed:', err);
   }
-  
-  attemptLoad(0);
-}).catch(err => {
-  document.getElementById('loadingMsg').classList.remove('show');
-  document.getElementById('errorMsg').classList.add('show');
-  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load THREE.js. Check your internet connection.';
-  console.error('THREE.js loading failed:', err);
-  throw err;
-});
-
-window.FBX_LOADER_PROMISE = window.THREE_LOAD_PROMISE.then(() => {
-  return import('https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/loaders/FBXLoader.js')
-    .then(module => {
-      window.THREE.FBXLoader = module.FBXLoader;
-    });
-}).catch(err => {
-  document.getElementById('loadingMsg').classList.remove('show');
-  document.getElementById('errorMsg').classList.add('show');
-  document.getElementById('errorMsg').textContent = 'ERROR: Failed to load FBXLoader. Check your internet connection.';
-  console.error('FBXLoader loading failed:', err);
-  throw err;
-});
+})();
 </script>
 
-<!-- MAIN GAME CODE (runs after THREE.js loads) -->
+<!-- MAIN GAME CODE (initializeGame is called by the module loader above) -->
 <script>
-window.FBX_LOADER_PROMISE.then(() => {
-  document.getElementById('loadingMsg').classList.remove('show');
-  initializeGame();
-}).catch(() => {});
-
 function initializeGame() {
   function ensureMenuMusic(){
     try{ if(window.AUDIO) window.AUDIO.play('menu'); }catch(e){} }
@@ -1192,6 +1175,9 @@ let previewCharIdx = 0;
 (function previewScene(){
   const canvas = document.getElementById('previewCanvas');
   const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+  // These lights were tuned under the pre-r155 light model; keep it, or three's physical
+  // falloff reads their intensities as near-black.
+  renderer.useLegacyLights = true;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(50,1,0.1,100);
   camera.position.set(0,3.4,7.5);
@@ -1253,6 +1239,8 @@ let previewCharIdx = 0;
    ========================================================================= */
 const fightCanvas = document.getElementById('fightCanvas');
 const fRenderer = new THREE.WebGLRenderer({canvas:fightCanvas, antialias:true});
+// As above: the fight lights predate r155's physical light units, so hold the legacy model.
+fRenderer.useLegacyLights = true;
 fRenderer.setPixelRatio(Math.min(devicePixelRatio,2));
 const fScene = new THREE.Scene();
 fScene.fog = new THREE.Fog(0x05050a, 14, 40);
@@ -1272,88 +1260,41 @@ const key1 = new THREE.SpotLight(0xffffff, 3.2, 40, 0.55, 0.4); key1.position.se
 const key2 = new THREE.SpotLight(0x88aaff, 2.4, 40, 0.55, 0.4); key2.position.set(6,10,-4); fScene.add(key2);
 const rim  = new THREE.PointLight(0xff2a34, 3, 30); rim.position.set(0,4,-10); fScene.add(rim);
 
-/* arena floor */
-const arenaFloor = new THREE.Mesh(
-  new THREE.PlaneGeometry(80,80),
-  new THREE.MeshStandardMaterial({color:0x0a0a0d, roughness:0.9})
-);
-arenaFloor.rotation.x=-Math.PI/2; fScene.add(arenaFloor);
-
 const RING_SIZE = 8;
-const ramp = new THREE.Mesh(
-  new THREE.BoxGeometry(4, 0.4, 22),
-  new THREE.MeshStandardMaterial({color:0x111116})
-);
-ramp.position.set(0, 0.2, 20);
-fScene.add(ramp);
-// Walking surface of the ramp (centre + half its 0.4 thickness) and the z where it meets the
-// arena floor (centre - half its 22 length). The entrance walk steps down between the two.
-const RAMP_TOP_Y = ramp.position.y + 0.2;
-const RAMP_END_Z = ramp.position.z - 11;
-function entranceGroundY(z){ return z >= RAMP_END_Z ? RAMP_TOP_Y : 0; }
-const rampGlowL = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.1,22), new THREE.MeshBasicMaterial({color:0xff2a34}));
-rampGlowL.position.set(-1.9,0.42,20); fScene.add(rampGlowL);
-const rampGlowR = rampGlowL.clone(); rampGlowR.position.x=1.9; fScene.add(rampGlowR);
 
-const stageBack = new THREE.Mesh(
-  new THREE.BoxGeometry(10,7,0.6),
-  new THREE.MeshStandardMaterial({color:0x0c0c10, emissive:0x1a0508, emissiveIntensity:0.6})
-);
-stageBack.position.set(0,3.5,30); fScene.add(stageBack);
-
-const crowdGeo = new THREE.SphereGeometry(0.12,4,4);
-const crowdMat = new THREE.MeshBasicMaterial({color:0x554466});
-const crowd = new THREE.InstancedMesh(crowdGeo, crowdMat, 400);
-{
-  const dummy = new THREE.Object3D();
-  let i=0;
-  for(let ring2=0; ring2<8; ring2++){
-    for(let a=0;a<50;a++){
-      const ang = (a/50)*Math.PI*2;
-      const rad = 16+ring2*1.4;
-      dummy.position.set(Math.cos(ang)*rad, 1+Math.random()*3.5, Math.sin(ang)*rad);
-      dummy.updateMatrix();
-      if(i<400){ crowd.setMatrixAt(i, dummy.matrix); i++; }
-    }
-  }
-}
-fScene.add(crowd);
-
+/* ----- VOXEL ARENA -----
+ * The gym, ring and stands come from src/arena, which is authored in its own much larger units:
+ * the rope line sits at +/-RING.ropeHalf and the gym floor at y=0. Scale the whole build so the
+ * ropes land on +/-RING_SIZE/2 -- the box BOUND already clamps the fighters inside -- and turn it
+ * 180 degrees so its walkout tunnel faces the +z the fighters enter from. The builders only ever
+ * call scene.add(), so a Group stands in for the scene and lets the arena be transformed as one
+ * without editing the copied modules. */
 let arenaModel = null;
-function loadArenaModel(){
-  const loader = new THREE.FBXLoader();
-  const modelPath = encodeURI('boxing arena/boxing.fbx');
-  loader.load(modelPath, object => {
-    object.traverse(child => {
-      if(child.isMesh){
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-    object.rotation.y = Math.PI;
 
-    // The FBX is authored ~1850 units across, so fit its width to RING_SIZE rather than
-    // guessing a factor: the ropes then land on +/-RING_SIZE/2, just outside BOUND, and the
-    // ring stays well inside fScene.fog's far plane. Measure after the rotation is applied.
-    object.updateMatrixWorld(true);
-    const rawSize = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
-    object.scale.setScalar(RING_SIZE / rawSize.x);
-
-    // Re-measure at the fitted scale to centre the ring on the fighters and sit it on the floor.
-    object.updateMatrixWorld(true);
-    const fitted = new THREE.Box3().setFromObject(object);
-    const centre = fitted.getCenter(new THREE.Vector3());
-    object.position.set(-centre.x, -fitted.min.y, -centre.z);
-
-    arenaModel = object;
-    fScene.add(arenaModel);
-    measureRingFloor();
-  }, undefined, err => {
-    console.error('Arena model load error:', err);
-    document.getElementById('errorMsg').classList.add('show');
-    document.getElementById('errorMsg').textContent = 'ERROR: Could not load boxing arena model.';
-  });
+function buildArena(){
+  const { buildGym, buildRing, buildStands, RING } = window.ARENA;
+  const arena = new THREE.Group();
+  buildGym(arena);
+  buildRing(arena);
+  buildStands(arena);
+  arena.scale.setScalar((RING_SIZE / 2) / RING.ropeHalf);
+  arena.rotation.y = Math.PI;
+  arenaModel = arena;
+  fScene.add(arena);
+  // measureRingFloor raycasts in world space, so the transform above has to be baked in before
+  // it runs -- otherwise it reads the arena at identity and finds the gym floor, not the canvas.
+  arena.updateMatrixWorld(true);
+  measureRingFloor();
 }
+
+/* The gym floor is flat concrete from the tunnel mouth to the ring apron, so the walkout runs at
+ * y=0 the whole way in; measureRingFloor puts the fighters up on the canvas once the bell rings. */
+function entranceGroundY(z){ return 0; }
+
+/* Where the walkout begins: just inside the tunnel mouth, which the gym puts at z=15, walking to
+ * the ring apron at z=5.1. The runway itself is only ~3.1 units tall once scaled and the entrance
+ * camera rides at y=3.2, so the walk is staged in the gym rather than back inside the tunnel. */
+const ENTRANCE_START_Z = 14;
 
 /* ----- FIGHTER FACTORY ----- */
 function createFighter(charData, side){
@@ -1446,9 +1387,9 @@ function createFighter(charData, side){
 }
 
 /* ----- RING FLOOR ----- *
- * The arena FBX is seated with its lowest point on y=0, but the canvas fighters stand on is a
+ * The arena is seated with its gym floor on y=0, but the canvas fighters stand on is a
  * raised platform some way above that. Rather than guess the height, cast a ray straight down
- * through the centre of the ring and read the surface back off the model. */
+ * through the centre of the ring and read the surface back off the arena. */
 let ringFloorY = 0;
 
 function measureRingFloor(){
@@ -1599,15 +1540,16 @@ function startMatch(){
   document.getElementById('controlsHint').classList.add('hidden');
   document.getElementById('resultScreen').style.display='none';
 
-  p1F.group.position.set(0, entranceGroundY(26) + p1F.footOffset, 26);
-  p2F.group.position.set(0, entranceGroundY(26) + p2F.footOffset, 26);
+  p1F.group.position.set(0, entranceGroundY(ENTRANCE_START_Z) + p1F.footOffset, ENTRANCE_START_Z);
+  p2F.group.position.set(0, entranceGroundY(ENTRANCE_START_Z) + p2F.footOffset, ENTRANCE_START_Z);
   p1F.group.visible=false;
   p2F.group.visible=false;
   p1F.group.rotation.y = Math.PI;
   p2F.group.rotation.y = Math.PI;
 
-  fCamera.position.set(0,3.4,24);
-  fCamera.lookAt(0,2,20);
+  // Hold inside the tunnel looking in towards the ring, matching where the walkout begins.
+  fCamera.position.set(0,3.4,ENTRANCE_START_Z - 2);
+  fCamera.lookAt(0,2,ENTRANCE_START_Z - 6);
 
   if(entranceOn){
     runEntranceSequence();
@@ -1676,14 +1618,14 @@ function runEntranceSequence(){
     whoEl.style.opacity=0;
     whoEl.textContent = label;
     fighter.group.visible=true;
-    fighter.group.position.set(0, entranceGroundY(26) + fighter.footOffset, 26);
+    fighter.group.position.set(0, entranceGroundY(ENTRANCE_START_Z) + fighter.footOffset, ENTRANCE_START_Z);
     fighter.group.rotation.y = Math.PI;
 
     await fadeEl(nowEl,1,350);
     await fadeEl(whoEl,1,400);
 
-    const startZ = 26, endZ = 5.2;
-    const camStartZ = 24, camEndZ = 9;
+    const startZ = ENTRANCE_START_Z, endZ = 5.2;
+    const camStartZ = ENTRANCE_START_Z - 2, camEndZ = 9;
     const dur = 3200;
     const t0 = performance.now();
     await new Promise(res=>{
@@ -2060,7 +2002,7 @@ function fightLoop(){
   fRenderer.render(fScene, fCamera);
 }
 
-loadArenaModel();
+buildArena();
 fightLoop();
 
 } // end initializeGame function
