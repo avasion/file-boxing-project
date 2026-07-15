@@ -33,8 +33,8 @@
     display:grid;
     grid-template-columns: 260px 1fr 300px;
     grid-template-rows: 1fr auto;
-    gap:14px;
-    padding:18px;
+    gap:10px;
+    padding:12px 18px;
     background:
       radial-gradient(ellipse at 50% -10%, #241014 0%, transparent 55%),
       linear-gradient(180deg,#08080a,#0a0a0d 40%);
@@ -50,14 +50,16 @@
     background:linear-gradient(180deg, var(--red-bright), transparent);
   }
 
-  /* left column */
-  #leftCol{ display:flex; flex-direction:column; gap:14px; grid-row:1/2; }
-  .menuTitle{ font-size:22px; padding:12px 16px 2px; color:var(--muted); letter-spacing:3px;}
+  /* left column. Spans both grid rows so the backstage panel runs the full height of
+     the window down to the bottom edge -- its pages are the tallest content in the menu
+     and get clipped in a single-row column. #selectBar starts at column 2 to make room. */
+  #leftCol{ display:flex; flex-direction:column; gap:14px; grid-row:1/3; min-height:0; }
+  .menuTitle{ font-size:22px; padding:8px 14px 2px; color:var(--muted); letter-spacing:3px;}
   /* The nav is kept compact so the backstage panel below it keeps as much of the
      column as possible -- its pages are the tallest content in the menu. */
   #mainMenuList{ list-style:none; padding:8px; display:flex; flex-direction:column; gap:2px;}
   #mainMenuList li{
-    padding:9px 16px; font-size:17px; letter-spacing:2px; color:var(--muted);
+    padding:7px 16px; font-size:17px; letter-spacing:2px; color:var(--muted);
     cursor:pointer; transition:.15s; border-left:4px solid transparent;
   }
   #mainMenuList li:hover:not(.active){
@@ -67,10 +69,10 @@
     background:linear-gradient(90deg, var(--red), #7a0d12 90%);
     color:#fff; border-left:4px solid var(--gold);
   }
-  #backstagePanel{ flex:1; min-height:0; padding-bottom:10px;}
-  #backstagePanel .menuTitle{ font-size:20px; }
+  #backstagePanel{ flex:1; min-height:0; padding-bottom:4px;}
+  #backstagePanel .menuTitle{ font-size:16px; }
   .backstageArt{
-    height:calc(100% - 40px); margin:0 10px 10px;
+    height:calc(100% - 28px); margin:0 8px 6px;
     background:
       repeating-linear-gradient(90deg, #1c1c20 0 2px, transparent 2px 40px),
       linear-gradient(180deg,#151518,#0a0a0c 70%);
@@ -90,28 +92,30 @@
   }
 
   /* Menu Pages in Backstage */
-  .backstagePage{ position:absolute; inset:0; display:none; flex-direction:column; padding:14px; overflow-y:auto; z-index:1; }
+  /* Compact metrics throughout: the PLAY page has to fit stats + 4 upgrades + 3 specials in
+     one column without scrolling. */
+  .backstagePage{ position:absolute; inset:0; display:none; flex-direction:column; padding:10px 12px; overflow-y:auto; z-index:1; }
   .backstagePage.active{ display:flex; }
   .backstagePage::-webkit-scrollbar{ width:6px; }
   .backstagePage::-webkit-scrollbar-track{ background:#0a0a0d; }
   .backstagePage::-webkit-scrollbar-thumb{ background:#2a2a30; }
 
-  .pageTitle{ font-size:14px; letter-spacing:2px; color:var(--gold); margin-bottom:10px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .pageTitle{ font-size:13px; letter-spacing:2px; color:var(--gold); margin-bottom:6px; border-bottom:1px solid var(--line); padding-bottom:4px; }
   /* The LOCKER ROOM badge (.backstageArt::after) is pinned to the top-right of the panel,
      so the topmost title has to keep clear of it or long ones run underneath. */
   .backstagePage > .pageTitle:first-child{ padding-right:104px; }
-  .statRow{ display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:11px; color:var(--muted); border-bottom:1px solid rgba(42,42,48,0.4); }
+  .statRow{ display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:11px; color:var(--muted); border-bottom:1px solid rgba(42,42,48,0.4); }
   .statRow .label{ font-weight:600; }
   .statRow .val{ color:#fff; font-family:'Bebas Neue'; }
-  .statRow.highlight{ background:rgba(192,20,28,0.15); padding:8px; margin:4px 0; border:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .statRow.highlight{ background:rgba(192,20,28,0.15); padding:5px 8px; margin:3px 0; border:1px solid var(--line); border-bottom:1px solid var(--line); }
 
   /* Skill point allocation. The stepper controls sit in the ~300px backstage column,
      so they get their own compact sizing rather than reusing .resultBtn. */
-  .ptsBar{ display:flex; align-items:center; gap:10px; padding:4px 0 8px; border-bottom:1px solid rgba(42,42,48,0.4); }
+  .ptsBar{ display:flex; align-items:center; gap:10px; padding:3px 0 5px; border-bottom:1px solid rgba(42,42,48,0.4); }
   .ptsItem{ font-size:10px; font-weight:600; letter-spacing:1px; color:var(--muted); }
   .ptsItem b{ margin-left:5px; font-family:'Bebas Neue'; font-size:16px; color:#fff; }
   .ptsBar .miniBtn{ margin-left:auto; }
-  .upgradeRow{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:5px 0; border-bottom:1px solid rgba(42,42,48,0.4); }
+  .upgradeRow{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:3px 0; border-bottom:1px solid rgba(42,42,48,0.4); }
   .upgradeRow .uName{ font-size:11px; font-weight:600; letter-spacing:1px; color:var(--muted); }
   .upgradeRow .uHint{ display:block; margin-top:2px; font-size:9px; font-weight:400; letter-spacing:0; color:#5c5c66; }
   .stepper{ display:flex; align-items:center; gap:4px; }
@@ -127,6 +131,28 @@
     background:#161619; border:1px solid var(--line); color:#fff; font-size:11px; letter-spacing:2px;
   }
   .miniBtn:hover{ border-color:var(--gold); color:var(--gold); }
+
+  /* Special skill unlocks. Same column budget as .upgradeRow, but the unlock button carries a
+     cost so it needs a wider right-hand track than the steppers. */
+  .specialRow{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; padding:4px 0; border-bottom:1px solid rgba(42,42,48,0.4); }
+  .specialRow .sName{ font-size:11px; font-weight:600; letter-spacing:1px; color:var(--muted); }
+  .specialRow .sHint{ display:block; margin-top:1px; font-size:8px; font-weight:400; letter-spacing:0; color:#5c5c66; }
+  .specialRow.owned .sName{ color:var(--gold); }
+  .specialRow .sKey{
+    display:inline-block; margin-left:6px; padding:0 4px; border:1px solid #3a3a42;
+    font-size:9px; color:#8a8a92; border-radius:2px;
+  }
+  .specialRow.owned .sKey{ border-color:var(--gold); color:var(--gold); }
+  .unlockBtn{
+    padding:5px 10px; cursor:pointer; font-family:inherit; white-space:nowrap;
+    background:#161619; border:1px solid var(--line); color:#fff; font-size:10px; letter-spacing:1px;
+  }
+  .unlockBtn:hover:not(:disabled){ border-color:var(--gold); color:var(--gold); }
+  .unlockBtn:disabled{ opacity:.4; cursor:default; }
+  .unlockBtn.owned{ border-color:var(--gold); color:var(--gold); background:rgba(212,175,55,.1); }
+
+  .charCard .cRank{ font-size:9px; color:var(--gold); letter-spacing:1px; margin-top:3px; }
+  .charCard .cRec{ font-size:9px; color:var(--muted); margin-top:2px; }
 
   .scoreboard{ width:100%; }
   .scoreRow{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; padding:8px; background:rgba(0,0,0,0.3); border:1px solid var(--line); }
@@ -189,7 +215,7 @@
   #startMatchBtn.disabled{ opacity:.35; pointer-events:none; box-shadow:none; }
 
   /* bottom: character select */
-  #selectBar{ grid-column:1/4; display:flex; flex-direction:column; gap:8px; }
+  #selectBar{ grid-column:2/4; display:flex; flex-direction:column; gap:8px; }
   #selectTabs{ display:flex; gap:10px; align-items:center; justify-content:center; }
   .slotTab{
     padding:8px 22px; font-size:14px; letter-spacing:3px; cursor:pointer;
@@ -386,6 +412,15 @@
                 </span>
               </div>
             </div>
+
+            <div class="pageTitle" style="margin-top:12px;">SPECIAL SKILLS</div>
+            <div id="specialsPanel">
+              <div class="ptsBar">
+                <span class="ptsItem">SPECIAL PTS<b id="specialPts">0</b></span>
+                <span class="ptsItem" style="margin-left:auto; color:#5c5c66;">1 KO = 5 PTS</span>
+              </div>
+              <div id="specialsList"></div>
+            </div>
           </div>
 
           <!-- CAREER Page -->
@@ -483,7 +518,7 @@
       </div>
       <div class="setupRow" style="border-bottom:none;">
         <span class="label">CONTROLS</span>
-        <span class="val" style="font-size:11px; color:var(--muted); text-align:right;">MOVE&#58; WASD<br>JAB&#58; J&#8195;POWER PUNCH&#58; K&#8195;BLOCK&#58; SHIFT</span>
+        <span class="val" id="setupControls" style="font-size:11px; color:var(--muted); text-align:right; display:block;">MOVE&#58; WASD<br>JAB&#58; J&#8195;POWER PUNCH&#58; K&#8195;BLOCK&#58; SHIFT</span>
       </div>
       <div id="startMatchBtn" class="display disabled">START MATCH</div>
     </div>
@@ -528,7 +563,8 @@
     </div>
 
     <div id="controlsHint" class="hidden">
-      <span>MOVE&#58;WASD&#8195;JAB&#58;J&#8195;POWER PUNCH&#58;K&#8195;BLOCK&#58;SHIFT</span>
+      <span id="controlsHintBase">MOVE&#58;WASD&#8195;JAB&#58;J&#8195;POWER PUNCH&#58;K&#8195;BLOCK&#58;SHIFT</span>
+      <span id="controlsHintSpecials" style="display:none;"></span>
     </div>
 
     <div id="centerText"><div class="big display" id="bigText"></div></div>
@@ -709,6 +745,37 @@ let cpuSkillPts = 0;
 const playerUpgrades = { hp:0, stamina:0, energy:0, damage:0 };
 const cpuUpgrades = { hp:0, stamina:0, energy:0, damage:0 };
 
+/* ----- SPECIAL SKILLS -----
+ * A currency separate from the stat-upgrade points: special points are only minted by
+ * knockouts, so specials are gated behind finishing fights rather than just winning them.
+ * Each skill is a one-off unlock that adds a new attack type to the player's moveset;
+ * `anim` poses the rig for that move and is driven from updateAttackAnim(). */
+const KO_SPECIAL_POINTS = 5;
+let playerSpecialPts = 0;
+const playerSpecials = { uppercut:false, haymaker:false, liverShot:false };
+
+const SPECIAL_SKILLS = {
+  uppercut: {
+    name:'UPPERCUT', cost:5, key:'KeyU', keyLabel:'U',
+    hint:'Rising inside shot',
+    dur:0.62, range:1.5, dmgMin:16, dmgMax:24,
+    hitStart:0.45, hitEnd:0.65, anim:animUppercut,
+  },
+  haymaker: {
+    name:'HAYMAKER', cost:10, key:'KeyI', keyLabel:'I',
+    hint:'Wide overhand, slow wind-up',
+    dur:0.85, range:1.9, dmgMin:22, dmgMax:32,
+    hitStart:0.55, hitEnd:0.72, anim:animHaymaker,
+  },
+  liverShot: {
+    name:'LIVER SHOT', cost:15, key:'KeyO', keyLabel:'O',
+    hint:'Body blow, pierces block',
+    dur:0.5, range:1.4, dmgMin:12, dmgMax:18,
+    hitStart:0.4, hitEnd:0.6, anim:animLiverShot,
+    piercesBlock:true,
+  },
+};
+
 function loadUpgrades(){
   try{
     const s = localStorage.getItem('boxing_upgrades');
@@ -716,13 +783,60 @@ function loadUpgrades(){
       const obj = JSON.parse(s);
       Object.assign(playerUpgrades, obj.playerUpgrades||{});
       Object.assign(cpuUpgrades, obj.cpuUpgrades||{});
+      Object.assign(playerSpecials, obj.playerSpecials||{});
       playerSkillPts = obj.playerSkillPts||0;
       cpuSkillPts = obj.cpuSkillPts||0;
+      playerSpecialPts = obj.playerSpecialPts||0;
     }
   }catch(e){}
 }
 function saveUpgrades(){
-  try{ localStorage.setItem('boxing_upgrades', JSON.stringify({ playerUpgrades, cpuUpgrades, playerSkillPts, cpuSkillPts })); }catch(e){}
+  try{
+    localStorage.setItem('boxing_upgrades', JSON.stringify({
+      playerUpgrades, cpuUpgrades, playerSkillPts, cpuSkillPts, playerSpecials, playerSpecialPts,
+    }));
+  }catch(e){}
+}
+
+/* ----- RANKING STATS PERSISTENCE -----
+ * careerStats is the global record; fighterStats is the per-boxer record keyed by name, so a
+ * roster card can show how that specific fighter has performed under the player's build. */
+let fighterStats = {};
+
+function blankFighterRecord(){
+  return { matches:0, wins:0, losses:0, kos:0, damage:0 };
+}
+function fighterRecord(name){
+  if(!fighterStats[name]) fighterStats[name] = blankFighterRecord();
+  return fighterStats[name];
+}
+
+/* Ranking score: a win is worth more than a KO on its own, but a fighter who finishes fights
+   outranks one who coasts to decisions on the same record. */
+function rankScore(rec){
+  return rec.wins*3 + rec.kos*2 + Math.floor(rec.damage/100);
+}
+
+/* Roster order by ranking score, so each card can show its live #N placing. */
+function rankedNames(){
+  return CHARACTERS
+    .map(c => ({ name:c.name, score:rankScore(fighterRecord(c.name)) }))
+    .sort((a,b) => b.score - a.score || a.name.localeCompare(b.name))
+    .map(e => e.name);
+}
+
+function loadRankingStats(){
+  try{
+    const s = localStorage.getItem('boxing_ranking');
+    if(s){
+      const obj = JSON.parse(s);
+      Object.assign(careerStats, obj.careerStats||{});
+      fighterStats = obj.fighterStats||{};
+    }
+  }catch(e){}
+}
+function saveRankingStats(){
+  try{ localStorage.setItem('boxing_ranking', JSON.stringify({ careerStats, fighterStats })); }catch(e){}
 }
 
 function updateUpgradesUI(){
@@ -732,6 +846,54 @@ function updateUpgradesUI(){
   document.getElementById('player_stam').textContent = playerUpgrades.stamina;
   document.getElementById('player_energy').textContent = playerUpgrades.energy;
   document.getElementById('player_dmg').textContent = playerUpgrades.damage;
+}
+
+/* ----- SPECIAL SKILLS UI ----- */
+function updateSpecialsUI(){
+  document.getElementById('specialPts').textContent = playerSpecialPts;
+  const list = document.getElementById('specialsList');
+  list.innerHTML = Object.entries(SPECIAL_SKILLS).map(([id, sk]) => {
+    const owned = !!playerSpecials[id];
+    const afford = playerSpecialPts >= sk.cost;
+    return `
+      <div class="specialRow ${owned?'owned':''}">
+        <span class="sName">${sk.name}${owned?`<span class="sKey">${sk.keyLabel}</span>`:''}
+          <span class="sHint">${sk.hint}</span>
+        </span>
+        <button class="unlockBtn ${owned?'owned':''}" data-skill="${id}"
+                ${owned || !afford ? 'disabled' : ''}>
+          ${owned ? 'UNLOCKED' : sk.cost + ' PTS'}
+        </button>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('.unlockBtn[data-skill]').forEach(btn => {
+    btn.addEventListener('click', () => unlockSpecial(btn.dataset.skill));
+  });
+}
+
+function unlockSpecial(id){
+  const sk = SPECIAL_SKILLS[id];
+  if(!sk || playerSpecials[id] || playerSpecialPts < sk.cost) return;
+  playerSpecialPts -= sk.cost;
+  playerSpecials[id] = true;
+  saveUpgrades();
+  updateSpecialsUI();
+  updateControlsHint();
+}
+
+/* Only unlocked specials are bound to keys, so only they are advertised in the two hints. */
+function updateControlsHint(){
+  const owned = Object.entries(SPECIAL_SKILLS).filter(([id]) => playerSpecials[id]);
+  const text = owned.map(([,sk]) => `${sk.name}:${sk.keyLabel}`).join(' ');
+
+  const fightHint = document.getElementById('controlsHintSpecials');
+  fightHint.textContent = text;
+  fightHint.style.display = owned.length ? '' : 'none';
+
+  const setup = document.getElementById('setupControls');
+  setup.innerHTML = 'MOVE: WASD<br>JAB: J POWER PUNCH: K BLOCK: SHIFT'
+    + (owned.length ? `<br><span style="color:var(--gold);">${text}</span>` : '');
 }
 
 function allocateUpgrade(target, stat, delta){
@@ -763,6 +925,7 @@ function autoAllocateCpu(){
 }
 
 loadUpgrades();
+loadRankingStats();
 
 /* ----- MENU PAGE SWITCHER ----- */
 const menuItems = document.querySelectorAll('#mainMenuList li');
@@ -787,22 +950,40 @@ menuItems.forEach((item, idx) => {
 
 /* ----- POPULATE SUPERSTARS ROSTER ----- */
 function initRoster(){
+  updateRosterStats();
+}
+
+/* Re-renders the roster cards with each fighter's stored record and live ranking. Called on
+   boot and after every match, so a card always reflects the persisted stats. */
+function updateRosterStats(){
   const rosterGrid = document.getElementById('rosterGrid');
-  CHARACTERS.forEach(c => {
-    const card = document.createElement('div');
-    card.className = 'charCard';
-    card.innerHTML = `
-      <div class="cName" style="color:#${c.color.toString(16).padStart(6,'0')}">${c.name}</div>
-      <div class="cStat">RATING</div>
-      <div class="cOv">${c.overall}</div>`;
-    rosterGrid.appendChild(card);
-  });
+  if(!rosterGrid) return;
+  const order = rankedNames();
+  rosterGrid.innerHTML = CHARACTERS.map(c => {
+    const rec = fighterRecord(c.name);
+    const rank = order.indexOf(c.name) + 1;
+    const record = rec.matches ? `${rec.wins}W-${rec.losses}L · ${rec.kos} KO` : 'NO FIGHTS';
+    return `
+      <div class="charCard">
+        <div class="cName" style="color:#${c.color.toString(16).padStart(6,'0')}">${c.name}</div>
+        <div class="cStat">RATING</div>
+        <div class="cOv">${c.overall}</div>
+        <div class="cRank">RANK #${rank}</div>
+        <div class="cRec">${record}</div>
+      </div>`;
+  }).join('');
 }
 
 /* ----- UPDATE CAREER STATS ----- */
 function updateCareerStats(winner, loser, isKO){
   careerStats.matchesPlayed++;
-  
+
+  // Both boxers carry a record, whichever side of the match they were on.
+  const winRec = fighterRecord(winner.name), loseRec = fighterRecord(loser.name);
+  winRec.matches++; loseRec.matches++;
+  winRec.wins++; loseRec.losses++;
+  if(isKO) winRec.kos++;
+
   if(winner === p1F){
     careerStats.wins++;
     careerStats.currentStreak++;
@@ -810,6 +991,8 @@ function updateCareerStats(winner, loser, isKO){
     careerStats.lastResult = 'WIN';
     // award skill points to player
     playerSkillPts += 5;
+    // Special points are minted by knockouts only -- a decision win earns none.
+    if(isKO) playerSpecialPts += KO_SPECIAL_POINTS;
   } else {
     careerStats.losses++;
     careerStats.currentStreak = 0;
@@ -818,7 +1001,7 @@ function updateCareerStats(winner, loser, isKO){
     cpuSkillPts += 5;
     autoAllocateCpu();
   }
-  
+
   careerStats.recentMatches.unshift({
     opponent: winner === p1F ? loser.name : winner.name,
     result: winner === p1F ? 'W' : 'L',
@@ -827,8 +1010,11 @@ function updateCareerStats(winner, loser, isKO){
   });
   if(careerStats.recentMatches.length > 5) careerStats.recentMatches.pop();
 
+  saveRankingStats();
   updateStatsUI();
   updateUpgradesUI();
+  updateSpecialsUI();
+  updateRosterStats();
 }
 
 function updateStatsUI(){
@@ -841,6 +1027,7 @@ function updateStatsUI(){
   document.getElementById('score-losses').textContent = careerStats.losses;
   const koRatio = careerStats.matchesPlayed > 0 ? Math.round((careerStats.totalKOs / careerStats.matchesPlayed)*100) : 0;
   document.getElementById('score-koratio').textContent = koRatio + '%';
+  document.getElementById('score-damage').textContent = Math.round(careerStats.totalDamageDealt);
 
   const recentFightsEl = document.getElementById('recentFights');
   recentFightsEl.innerHTML = careerStats.recentMatches.map(m => `
@@ -852,6 +1039,11 @@ function updateStatsUI(){
 }
 
 /* ----- PREVIEW FIGHTER FACTORY ----- */
+/* Distance from the preview rig's origin down to the soles: the legs are 0.9 tall centred
+   at y=0.45, so the feet already sit on the group origin and no offset is needed. Kept as a
+   named constant so the stand-on-canvas maths reads the same as the fight rig's. */
+const PREVIEW_FOOT_OFFSET = 0;
+
 function createPreviewFighter(charData){
   const group = new THREE.Group();
   const skin = 0xc79a73;
@@ -899,6 +1091,7 @@ function createPreviewFighter(charData){
   legR.position.set(-0.16, 0.45, 0);
   group.add(legR);
 
+  group.userData.shoulders = [shoulderL, shoulderR];
   return group;
 }
 
@@ -965,7 +1158,9 @@ document.getElementById('entranceToggle').addEventListener('click',(e)=>{
 // Initialize roster and stats on load
 initRoster();
 updateStatsUI();
- updateUpgradesUI();
+updateUpgradesUI();
+updateSpecialsUI();
+updateControlsHint();
 
 // Upgrade button handlers
 document.getElementById('inc_hp').addEventListener('click', ()=> allocateUpgrade('player','hp',1));
@@ -1003,10 +1198,13 @@ let previewCharIdx = 0;
   ring.position.y=-0.15; scene.add(ring);
   const canvasMat = new THREE.Mesh(new THREE.BoxGeometry(5.2,0.05,5.2), new THREE.MeshStandardMaterial({color:0x1a1a3a}));
   canvasMat.position.y=0.02; scene.add(canvasMat);
+  // Top face of the canvas mat: its centre plus half its 0.05 thickness. The preview fighter
+  // stands on this, not on y=0 -- the mat is what's visible under the boots.
+  const PREVIEW_CANVAS_TOP = canvasMat.position.y + 0.025;
 
   const charData = CHARACTERS[previewCharIdx];
   const fighter = createPreviewFighter(charData);
-  fighter.position.y = 0;
+  fighter.position.y = PREVIEW_CANVAS_TOP + PREVIEW_FOOT_OFFSET;
   scene.add(fighter);
 
   const postGeo = new THREE.CylinderGeometry(0.05,0.05,2.2,8);
@@ -1033,13 +1231,14 @@ let previewCharIdx = 0;
     camera.position.z = Math.cos(t)*7.5;
     camera.lookAt(0,0.8,0);
 
-    const breathe = Math.sin(t*1.2)*0.05;
+    // Breathe lifts off the canvas but never dips below it, so the boots stay planted.
+    const breathe = (Math.sin(t*1.2)*0.5 + 0.5) * 0.05;
     const sway = Math.sin(t*0.8)*0.08;
-    fighter.position.y = breathe;
+    fighter.position.y = PREVIEW_CANVAS_TOP + PREVIEW_FOOT_OFFSET + breathe;
     fighter.rotation.y = sway*0.3;
-    fighter.children.forEach(limb => {
-      if(limb.rotation) limb.rotation.x = Math.sin(t*1.5)*0.1;
-    });
+    // Sway the shoulders only -- rotating every child swung the legs about their centres
+    // and pushed the feet through the mat.
+    fighter.userData.shoulders.forEach(s => { s.rotation.x = Math.sin(t*1.5)*0.1; });
 
     renderer.render(scene,camera);
   }
@@ -1084,6 +1283,11 @@ const ramp = new THREE.Mesh(
 );
 ramp.position.set(0, 0.2, 20);
 fScene.add(ramp);
+// Walking surface of the ramp (centre + half its 0.4 thickness) and the z where it meets the
+// arena floor (centre - half its 22 length). The entrance walk steps down between the two.
+const RAMP_TOP_Y = ramp.position.y + 0.2;
+const RAMP_END_Z = ramp.position.z - 11;
+function entranceGroundY(z){ return z >= RAMP_END_Z ? RAMP_TOP_Y : 0; }
 const rampGlowL = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.1,22), new THREE.MeshBasicMaterial({color:0xff2a34}));
 rampGlowL.position.set(-1.9,0.42,20); fScene.add(rampGlowL);
 const rampGlowR = rampGlowL.clone(); rampGlowR.position.x=1.9; fScene.add(rampGlowR);
@@ -1140,6 +1344,7 @@ function loadArenaModel(){
 
     arenaModel = object;
     fScene.add(arenaModel);
+    measureRingFloor();
   }, undefined, err => {
     console.error('Arena model load error:', err);
     document.getElementById('errorMsg').classList.add('show');
@@ -1209,6 +1414,13 @@ function createFighter(charData, side){
   const leftLeg  = makeLeg(1);
   group.add(rightLeg.hip, leftLeg.hip);
 
+  // Distance from the group origin down to the soles. The rig hangs its legs off the hip
+  // group, so in the rest pose the boots bottom out well below y=0 -- placing the group at
+  // y=0 buries the fighter in the canvas. Measured rather than hardcoded so the number stays
+  // correct if the rig's proportions change.
+  group.updateMatrixWorld(true);
+  const footOffset = -new THREE.Box3().setFromObject(group).min.y;
+
   const up = (side==='player') ? playerUpgrades : cpuUpgrades;
   const maxHp = 100 + (up.hp||0) * 10;
   const damageMul = 1 + (up.damage||0) * 0.08;
@@ -1224,9 +1436,28 @@ function createFighter(charData, side){
     attackAnim:null,
     walkPhase:0,
     facing:1,
+    footOffset: footOffset,
     pos: new THREE.Vector3(),
     ko:false,
   };
+}
+
+/* ----- RING FLOOR ----- *
+ * The arena FBX is seated with its lowest point on y=0, but the canvas fighters stand on is a
+ * raised platform some way above that. Rather than guess the height, cast a ray straight down
+ * through the centre of the ring and read the surface back off the model. */
+let ringFloorY = 0;
+
+function measureRingFloor(){
+  if(!arenaModel) return;
+  const ray = new THREE.Raycaster(new THREE.Vector3(0, 50, 0), new THREE.Vector3(0, -1, 0));
+  const hits = ray.intersectObject(arenaModel, true);
+  // Ignore the lights and roof truss overhead: the canvas is the highest surface still down
+  // near floor level. Anything above MAX_CANVAS_Y is structure hanging over the ring.
+  const MAX_CANVAS_Y = 2.0;
+  const floorHits = hits.filter(h => h.point.y <= MAX_CANVAS_Y && h.point.y >= -1);
+  if(floorHits.length) ringFloorY = Math.max(...floorHits.map(h => h.point.y));
+  if(p1F && p2F && !fightActive) placeFightersInRing();
 }
 
 let p1F, p2F;
@@ -1254,13 +1485,83 @@ function handleAttackKey(code){
   if(!fightActive || matchOver) return;
   if(code===P1_KEYS.punch) startAttack(p1F,'light');
   if(code===P1_KEYS.heavy) startAttack(p1F,'heavy');
+  // Specials are only bound once they've been unlocked in the backstage panel.
+  for(const [id, sk] of Object.entries(SPECIAL_SKILLS)){
+    if(code===sk.key && playerSpecials[id]) startAttack(p1F, id);
+  }
 }
 
 function startAttack(f, type){
   if(f.attackAnim || f.ko) return;
-  const baseDur = type==='light'?0.3:0.55;
+  const sk = SPECIAL_SKILLS[type];
+  const baseDur = sk ? sk.dur : (type==='light'?0.3:0.55);
   const dur = baseDur * Math.max(0.6, 1 - (f.stamina||0)*0.45);
   f.attackAnim = { type, t:0, hit:false, dur };
+}
+
+/* ----- SPECIAL SKILL ANIMATIONS -----
+ * Each poses the rig for one move across the normalised time p (0..1) of the attack. They only
+ * ever raise group.y, never lower it: dropping the whole group to fake a crouch would push the
+ * boots back through the canvas, so crouches are built from hip and torso rotation instead. */
+
+function groundY(f){ return ringFloorY + f.footOffset; }
+
+function animUppercut(f, p){
+  // Dip for the first third to load the legs, then drive up and through.
+  const load  = Math.min(1, p/0.35);
+  const drive = Math.max(0, (p-0.35)/0.65);
+  const dip   = Math.sin(load*Math.PI*0.5) * (1-drive);
+  const arc   = Math.sin(drive*Math.PI);
+
+  f.leftLeg.hip.rotation.x  = dip*0.5;
+  f.rightLeg.hip.rotation.x = dip*0.5;
+  f.torso.rotation.x = dip*0.35 - drive*0.25;
+
+  // Right glove scoops from the hip up through the opponent's guard.
+  f.rightArm.shoulder.rotation.x = 0.9 - arc*3.0;
+  f.rightArm.elbow.rotation.x    = -1.2 + arc*0.5;
+  // Rises onto the toes at the top of the drive.
+  f.group.position.y = groundY(f) + arc*0.18;
+}
+
+function animHaymaker(f, p){
+  // Long coil, then a wide looping release over the top.
+  const wind   = Math.min(1, p/0.45);
+  const swingP = Math.max(0, (p-0.45)/0.55);
+  const w = Math.sin(wind*Math.PI*0.5) * (1-swingP);
+  const s = Math.sin(swingP*Math.PI);
+
+  f.torso.rotation.y = f.facing*(w*0.7 - s*0.9);
+  // z opens the arc out wide, x brings it over the top.
+  f.leftArm.shoulder.rotation.z = -(w*1.2) - s*0.6;
+  f.leftArm.shoulder.rotation.x = w*0.6 - s*2.9;
+  f.leftArm.elbow.rotation.x    = -0.5 - s*0.4;
+  f.leftLeg.hip.rotation.x  = -w*0.3 + s*0.35;
+  f.rightLeg.hip.rotation.x =  w*0.3 - s*0.35;
+}
+
+function animLiverShot(f, p){
+  // Compact crouch and a short dig into the body -- no wind-up to read.
+  const s = Math.sin(p*Math.PI);
+  const crouch = Math.sin(Math.min(1, p/0.5)*Math.PI*0.5) * (1 - Math.max(0,(p-0.7)/0.3));
+
+  f.leftLeg.hip.rotation.x  = crouch*0.6;
+  f.rightLeg.hip.rotation.x = crouch*0.6;
+  f.torso.rotation.x = crouch*0.45;
+  f.torso.rotation.y = -f.facing*s*0.4;
+
+  f.rightArm.shoulder.rotation.x = -s*1.1;
+  f.rightArm.shoulder.rotation.z = f.facing*s*0.5;
+  f.rightArm.elbow.rotation.x    = -1.5 + s*0.3;
+}
+
+function resetAttackPose(f){
+  f.rightArm.shoulder.rotation.set(0,0,0);
+  f.leftArm.shoulder.rotation.set(0,0,0);
+  f.rightArm.elbow.rotation.set(0,0,0);
+  f.leftArm.elbow.rotation.set(0,0,0);
+  f.torso.rotation.set(0,0,0);
+  f.group.position.y = groundY(f);
 }
 
 /* ----- ENTRANCE SEQUENCE ----- */
@@ -1289,8 +1590,8 @@ function startMatch(){
   document.getElementById('controlsHint').classList.add('hidden');
   document.getElementById('resultScreen').style.display='none';
 
-  p1F.group.position.set(0,0,26);
-  p2F.group.position.set(0,0,26);
+  p1F.group.position.set(0, entranceGroundY(26) + p1F.footOffset, 26);
+  p2F.group.position.set(0, entranceGroundY(26) + p2F.footOffset, 26);
   p1F.group.visible=false;
   p2F.group.visible=false;
   p1F.group.rotation.y = Math.PI;
@@ -1307,12 +1608,17 @@ function startMatch(){
   }
 }
 
+/* Corners are BOUND (3.1) from centre; starting the fighters right on the boundary leaves them
+   squared off too far apart to engage without a long walk-in. START_X squares them up just
+   outside each other's reach instead. */
+const START_X = 2.0;
+
 function placeFightersInRing(){
   p1F.group.visible=true;
   p2F.group.visible=true;
-  p1F.group.position.set(-2.6,0,0);
+  p1F.group.position.set(-START_X, ringFloorY + p1F.footOffset, 0);
   p1F.group.rotation.y = Math.PI/2;
-  p2F.group.position.set(2.6,0,0);
+  p2F.group.position.set(START_X, ringFloorY + p2F.footOffset, 0);
   p2F.group.rotation.y = -Math.PI/2;
 }
 
@@ -1361,7 +1667,7 @@ function runEntranceSequence(){
     whoEl.style.opacity=0;
     whoEl.textContent = label;
     fighter.group.visible=true;
-    fighter.group.position.set(0,0,26);
+    fighter.group.position.set(0, entranceGroundY(26) + fighter.footOffset, 26);
     fighter.group.rotation.y = Math.PI;
 
     await fadeEl(nowEl,1,350);
@@ -1377,6 +1683,7 @@ function runEntranceSequence(){
         const ease = 1-Math.pow(1-p,2);
         if(!skipRequested){
           fighter.group.position.z = startZ + (endZ-startZ)*ease;
+          fighter.group.position.y = entranceGroundY(fighter.group.position.z) + fighter.footOffset;
           fighter.walkPhase += 0.25;
           animateWalkCycle(fighter);
           fCamera.position.set(Math.sin(p*3)*0.6, 3.2, camStartZ+(camEndZ-camStartZ)*ease);
@@ -1388,6 +1695,7 @@ function runEntranceSequence(){
       requestAnimationFrame(step);
     });
     fighter.group.position.z = endZ;
+    fighter.group.position.y = entranceGroundY(endZ) + fighter.footOffset;
 
     await fadeEl(whoEl,0,300);
     await fadeEl(nowEl,0,200);
@@ -1556,8 +1864,11 @@ function updateAttackAnim(f, opponent, dt){
   anim.t += dt;
   const p = Math.min(1, anim.t/anim.dur);
   const swing = Math.sin(p*Math.PI);
+  const sk = SPECIAL_SKILLS[anim.type];
 
-  if(anim.type==='light'){
+  if(sk){
+    sk.anim(f, p);
+  } else if(anim.type==='light'){
     f.rightArm.shoulder.rotation.x = -swing*2.1;
     f.rightArm.elbow.rotation.x = -swing*0.5;
   } else {
@@ -1566,17 +1877,25 @@ function updateAttackAnim(f, opponent, dt){
     f.torso.rotation.y = -f.facing*swing*0.35;
   }
 
-  const hitWindowStart = anim.type==='light' ? 0.4 : 0.48;
-  const hitWindowEnd   = anim.type==='light' ? 0.6 : 0.68;
-    if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
+  const hitWindowStart = sk ? sk.hitStart : (anim.type==='light' ? 0.4 : 0.48);
+  const hitWindowEnd   = sk ? sk.hitEnd   : (anim.type==='light' ? 0.6 : 0.68);
+  if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
     const dist = f.group.position.distanceTo(opponent.group.position);
-    const range = anim.type==='light' ? 1.45 : 1.75;
+    const range = sk ? sk.range : (anim.type==='light' ? 1.45 : 1.75);
     if(dist < range){
       anim.hit = true;
-      let dmgBase = anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8);
+      const dmgBase = sk
+        ? (sk.dmgMin + Math.random()*(sk.dmgMax - sk.dmgMin))
+        : (anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8));
       let dmg = dmgBase * (f.damageMul||1);
-      if(opponent.blocking) dmg *= (opponent.blockReduction||0.22);
+      if(opponent.blocking && !(sk && sk.piercesBlock)) dmg *= (opponent.blockReduction||0.22);
       opponent.hp = Math.max(0, opponent.hp - dmg);
+
+      // Damage is banked per fighter and, for the player, into the career total.
+      fighterRecord(f.name).damage += dmg;
+      if(f === p1F) careerStats.totalDamageDealt += dmg;
+
+      if(sk) showBigText(sk.name+'!', 700);
       flashHit(opponent);
       updateHpUI();
       if(opponent.hp<=0 && !matchOver){
@@ -1587,11 +1906,7 @@ function updateAttackAnim(f, opponent, dt){
 
   if(p>=1){
     f.attackAnim = null;
-    f.rightArm.shoulder.rotation.x = 0;
-    f.rightArm.elbow.rotation.x = 0;
-    f.leftArm.shoulder.rotation.x = 0;
-    f.leftArm.elbow.rotation.x = 0;
-    f.torso.rotation.y = 0;
+    resetAttackPose(f);
   }
 }
 
@@ -1602,7 +1917,9 @@ function flashHit(f){
   setTimeout(()=>{
     mats.forEach(m=>{ if(m.emissive!==undefined){ m.emissiveIntensity=0; }});
   },120);
-  const dir = new THREE.Vector3().subVectors(f.group.position, (f===p1F?p2F:p1F).group.position).normalize();
+  const dir = new THREE.Vector3().subVectors(f.group.position, (f===p1F?p2F:p1F).group.position);
+  dir.y = 0; // knockback is along the canvas -- never lift or bury the fighter
+  dir.normalize();
   f.group.position.addScaledVector(dir, 0.12);
   f.group.position.x = THREE.MathUtils.clamp(f.group.position.x,-BOUND,BOUND);
   f.group.position.z = THREE.MathUtils.clamp(f.group.position.z,-BOUND,BOUND);
