@@ -1010,7 +1010,10 @@ function updateCareerStats(winner, loser, isKO){
   });
   if(careerStats.recentMatches.length > 5) careerStats.recentMatches.pop();
 
+  // Both stores have to be written: the match awards skill and special points, which live in
+  // the upgrades store, not the ranking one. Without this the points reset on reload.
   saveRankingStats();
+  saveUpgrades();
   updateStatsUI();
   updateUpgradesUI();
   updateSpecialsUI();
@@ -1457,7 +1460,13 @@ function measureRingFloor(){
   const MAX_CANVAS_Y = 2.0;
   const floorHits = hits.filter(h => h.point.y <= MAX_CANVAS_Y && h.point.y >= -1);
   if(floorHits.length) ringFloorY = Math.max(...floorHits.map(h => h.point.y));
-  if(p1F && p2F && !fightActive) placeFightersInRing();
+
+  // If the model only finished loading after a match was already under way, correct the
+  // fighters' height where they stand rather than teleporting them back to their corners.
+  if(fightActive){
+    if(p1F) p1F.group.position.y = groundY(p1F);
+    if(p2F) p2F.group.position.y = groundY(p2F);
+  }
 }
 
 let p1F, p2F;
@@ -1712,13 +1721,14 @@ function runEntranceSequence(){
     placeFightersInRing();
 
     const camFrom = fCamera.position.clone();
-    const camTo = new THREE.Vector3(0,3.6,9.5);
+    const camTo = fightCamPos();
+    const camTarget = fightCamTarget();
     const t0 = performance.now();
     await new Promise(res=>{
       function step(t){
         const p = Math.min(1,(t-t0)/900);
         fCamera.position.lerpVectors(camFrom,camTo,p);
-        fCamera.lookAt(0,1.4,0);
+        fCamera.lookAt(camTarget);
         if(p<1) requestAnimationFrame(step); else res();
       }
       requestAnimationFrame(step);
@@ -1756,13 +1766,19 @@ function showBigText(text, ms){
 function beginFight(){
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('controlsHint').classList.remove('hidden');
-  fCamera.position.set(0,3.6,9.5);
-  fCamera.lookAt(0,1.4,0);
+  fCamera.position.copy(fightCamPos());
+  fCamera.lookAt(fightCamTarget());
   showBigText('FIGHT!',1200);
   try{ if(window.AUDIO) window.AUDIO.stopAll(); }catch(e){}
   fightActive = true;
   clock.getDelta();
 }
+
+/* The ring canvas is a raised platform, so the fight camera has to ride up with it -- framed
+   against a fixed y it aimed at the apron, below the fighters' feet. These are the original
+   framing heights, now measured from the canvas the fighters actually stand on. */
+function fightCamPos(){ return new THREE.Vector3(0, ringFloorY + 3.6, 9.5); }
+function fightCamTarget(){ return new THREE.Vector3(0, ringFloorY + 1.4, 0); }
 
 /* ----- MAIN FIGHT UPDATE ----- */
 const BOUND = RING_SIZE/2 - 0.9;
