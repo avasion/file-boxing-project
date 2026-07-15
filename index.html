@@ -862,6 +862,14 @@ function initializeGame() {
     const m = document.getElementById('menuScreen');
     return !!m && m.style.display !== 'none';
   }
+  /* #fightScreen is hidden by CSS and only ever shown or hidden by inline style at the two
+   * transitions, so the inline value is the whole story -- '' means it has never been shown. A
+   * plain property read, so gating a frame on it costs nothing and forces no layout. */
+  function fightScreenIsUp(){
+    const el = document.getElementById('fightScreen');
+    return !!el && el.style.display === 'block';
+  }
+  window.__screenIsUp = { menu: menuIsUp, fight: fightScreenIsUp };
   function ensureMenuMusic(){
     if(!menuIsUp()) return;
     try{
@@ -1472,7 +1480,9 @@ let previewCharIdx = 0;
     const sway = Math.sin(t*0.8)*0.08;
     fighter.rotation.y = sway*0.3;
 
-    renderer.render(scene,camera);
+    // Same on this side: the preview kept drawing behind the fight screen. The animation above
+    // still ticks, so the clock stays continuous and the idle does not jump on the way back.
+    if(menuIsUp()) renderer.render(scene,camera);
   }
   loop();
 })();
@@ -2575,7 +2585,11 @@ function fightLoop(){
     document.getElementById('clock').textContent = `${mm}:${ss.toString().padStart(2,'0')}`;
   }
 
-  fRenderer.render(fScene, fCamera);
+  // Draw only when the fight screen is actually up. The arena is ~20 draw calls and 57k triangles
+  // under 14 lights with a 2048 shadow map, and it was rendering behind the menu every frame.
+  // Only the draw is skipped -- everything above still runs, because the match clock, the AI and
+  // the clip mixers all live in this loop.
+  if(fightScreenIsUp()) fRenderer.render(fScene, fCamera);
 }
 
 buildArena();
