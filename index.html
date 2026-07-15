@@ -728,7 +728,7 @@ window.AUDIO = (function(){
 <script type="module">
 (async () => {
   try {
-    const [THREE, gym, ring, stands, plc, oc, chars] = await Promise.all([
+    const [THREE, gym, ring, stands, plc, oc, chars, anims] = await Promise.all([
       import('three'),
       import('./src/arena/gym.js'),
       import('./src/arena/ring.js'),
@@ -736,8 +736,10 @@ window.AUDIO = (function(){
       import('three/addons/controls/PointerLockControls.js'),
       import('three/addons/controls/OrbitControls.js'),
       import('./src/characterMap.js'),
+      import('./src/arena/animations.js'),
     ]);
     window.CHARACTER_MAP = chars;
+    window.ANIM = anims;
     window.THREE = THREE;
     window.ARENA = {
       buildGym: gym.buildGym,
@@ -813,24 +815,71 @@ const KO_SPECIAL_POINTS = 5;
 let playerSpecialPts = 0;
 const playerSpecials = { uppercut:false, haymaker:false, liverShot:false };
 
+/* ----- ATTACKS -----
+ * The rig's five clips in src/arena/animations.js line up one-for-one with the game's five
+ * attacks, so each attack drives a clip and takes its timing from it. The game keeps its own
+ * names, costs, keys, damage and reach; animations.js supplies the motion and the unlock gate.
+ *
+ *   light (jab)   -> 'jab'        heavy (power punch) -> 'cross'
+ *   UPPERCUT      -> 'uppercut'   HAYMAKER            -> 'hook'   LIVER SHOT -> 'kick'
+ *
+ * Where the two tables disagree the game wins, per the merge: UPPERCUT stays 5 (SKILLS says 10)
+ * and HAYMAKER stays 10 (SKILLS says 5). */
+const ATTACK_CLIPS = {
+  light: 'jab',
+  heavy: 'cross',
+  uppercut: 'uppercut',
+  haymaker: 'hook',
+  liverShot: 'kick',
+};
+
+/* The strike is the hold between the two identical keyframes in each clip -- in clip seconds.
+ * Damage lands across that hold, so a hit registers on the frame the glove is actually out. */
+const CLIP_STRIKE = {
+  jab:      [0.10, 0.16],
+  cross:    [0.16, 0.24],
+  hook:     [0.22, 0.30],
+  uppercut: [0.26, 0.34],
+  kick:     [0.26, 0.34],
+};
+
+function clipDuration(name){
+  const c = window.ANIM.CLIPS.find(k => k.name === name);
+  return c ? c.duration : 0.4;
+}
+
+/* animations.js gates skills off a { points, unlocked[] } record, keyed by clip id. The game
+ * already persists playerSpecialPts and a playerSpecials map, so adapt that rather than add a
+ * second store. */
+const SKILL_ID = { uppercut:'uppercut', haymaker:'hook', liverShot:'kick' };
+
+function specialRecord(){
+  return {
+    points: playerSpecialPts,
+    unlocked: Object.keys(playerSpecials).filter(id => playerSpecials[id]).map(id => SKILL_ID[id]),
+  };
+}
+
+/** Is this special available to the player right now? */
+function specialUnlocked(id){
+  return window.ANIM.unlockedSkills(specialRecord()).some(s => s.id === SKILL_ID[id]);
+}
+
 const SPECIAL_SKILLS = {
   uppercut: {
     name:'UPPERCUT', cost:5, key:'KeyU', keyLabel:'U',
     hint:'Rising inside shot',
-    dur:0.62, range:1.5, dmgMin:16, dmgMax:24, target:'head', staCost:22,
-    hitStart:0.45, hitEnd:0.65, anim:animUppercut,
+    range:1.5, dmgMin:16, dmgMax:24, target:'head', staCost:22,
   },
   haymaker: {
     name:'HAYMAKER', cost:10, key:'KeyI', keyLabel:'I',
     hint:'Wide overhand, slow wind-up',
-    dur:0.85, range:1.9, dmgMin:22, dmgMax:32, target:'head', staCost:30,
-    hitStart:0.55, hitEnd:0.72, anim:animHaymaker,
+    range:1.9, dmgMin:22, dmgMax:32, target:'head', staCost:30,
   },
   liverShot: {
     name:'LIVER SHOT', cost:15, key:'KeyO', keyLabel:'O',
     hint:'Body blow, pierces block',
-    dur:0.5, range:1.4, dmgMin:12, dmgMax:18, target:'body', staCost:20,
-    hitStart:0.4, hitEnd:0.6, anim:animLiverShot,
+    range:1.4, dmgMin:12, dmgMax:18, target:'body', staCost:20,
     piercesBlock:true,
   },
 };
@@ -1605,6 +1654,9 @@ function createFighter(charData, side){
   const group = window.CHARACTER_MAP.buildCharacterModel(charData.name);
   group.scale.multiplyScalar(ARENA_SCALE);
   const bones = group.userData.bones;
+  // One animator per fighter. It drops the rig into the guard stance on creation, and every
+  // attack is a clip played through it.
+  const anim = window.ANIM.createFighterAnimator(group);
 
 
   // Distance from the group origin down to the soles. The rig hangs its legs off the hip
@@ -1633,7 +1685,7 @@ function createFighter(charData, side){
   group.traverse(o => { if(o.isMesh) o.castShadow = true; });
 
   return {
-    group, bones,
+    group, bones, anim,
     color:charData.color, name:charData.name,
     maxHp: maxHp, hp: maxHp, blocking:false,
     headMax, bodyMax, headHp: headMax, bodyHp: bodyMax,
@@ -1706,7 +1758,7 @@ function handleAttackKey(code){
   if(code===P1_KEYS.heavy) startAttack(p1F,'heavy');
   // Specials are only bound once they've been unlocked in the backstage panel.
   for(const [id, sk] of Object.entries(SPECIAL_SKILLS)){
-    if(code===sk.key && playerSpecials[id]) startAttack(p1F, id);
+    if(code===sk.key && specialUnlocked(id)) startAttack(p1F, id);
   }
 }
 
@@ -1763,10 +1815,14 @@ function startAttack(f, type){
   const cost = attackStaminaCost(type);
   if(f.staminaMeter < cost) return;      // too gassed to throw it
   f.staminaMeter -= cost;
-  const sk = SPECIAL_SKILLS[type];
-  const baseDur = sk ? sk.dur : (type==='light'?0.3:0.55);
+
+  // The clip is the animation and the timing: a faster fighter plays it faster rather than
+  // running a separate pose on its own clock.
+  const clip = ATTACK_CLIPS[type];
+  const baseDur = clipDuration(clip);
   const dur = baseDur * Math.max(0.6, 1 - (f.staminaBonus||0)*0.45);
-  f.attackAnim = { type, t:0, hit:false, dur };
+  if(f.anim) f.anim.play(clip, baseDur / dur);
+  f.attackAnim = { type, clip, t:0, hit:false, dur };
 }
 
 /* ----- SPECIAL SKILL ANIMATIONS -----
@@ -1775,64 +1831,6 @@ function startAttack(f, type){
  * boots back through the canvas, so crouches are built from hip and torso rotation instead. */
 
 function groundY(f){ return ringFloorY + f.footOffset; }
-
-function animUppercut(f, p){
-  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
-  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
-  if(!f.torso) return;
-  // Dip for the first third to load the legs, then drive up and through.
-  const load  = Math.min(1, p/0.35);
-  const drive = Math.max(0, (p-0.35)/0.65);
-  const dip   = Math.sin(load*Math.PI*0.5) * (1-drive);
-  const arc   = Math.sin(drive*Math.PI);
-
-  f.leftLeg.hip.rotation.x  = dip*0.5;
-  f.rightLeg.hip.rotation.x = dip*0.5;
-  f.torso.rotation.x = dip*0.35 - drive*0.25;
-
-  // Right glove scoops from the hip up through the opponent's guard.
-  f.rightArm.shoulder.rotation.x = 0.9 - arc*3.0;
-  f.rightArm.elbow.rotation.x    = -1.2 + arc*0.5;
-  // Rises onto the toes at the top of the drive.
-  f.group.position.y = groundY(f) + arc*0.18;
-}
-
-function animHaymaker(f, p){
-  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
-  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
-  if(!f.torso) return;
-  // Long coil, then a wide looping release over the top.
-  const wind   = Math.min(1, p/0.45);
-  const swingP = Math.max(0, (p-0.45)/0.55);
-  const w = Math.sin(wind*Math.PI*0.5) * (1-swingP);
-  const s = Math.sin(swingP*Math.PI);
-
-  f.torso.rotation.y = f.facing*(w*0.7 - s*0.9);
-  // z opens the arc out wide, x brings it over the top.
-  f.leftArm.shoulder.rotation.z = -(w*1.2) - s*0.6;
-  f.leftArm.shoulder.rotation.x = w*0.6 - s*2.9;
-  f.leftArm.elbow.rotation.x    = -0.5 - s*0.4;
-  f.leftLeg.hip.rotation.x  = -w*0.3 + s*0.35;
-  f.rightLeg.hip.rotation.x =  w*0.3 - s*0.35;
-}
-
-function animLiverShot(f, p){
-  // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
-  // parts. Posing is retargeted in the next commit; skip it rather than throw until then.
-  if(!f.torso) return;
-  // Compact crouch and a short dig into the body -- no wind-up to read.
-  const s = Math.sin(p*Math.PI);
-  const crouch = Math.sin(Math.min(1, p/0.5)*Math.PI*0.5) * (1 - Math.max(0,(p-0.7)/0.3));
-
-  f.leftLeg.hip.rotation.x  = crouch*0.6;
-  f.rightLeg.hip.rotation.x = crouch*0.6;
-  f.torso.rotation.x = crouch*0.45;
-  f.torso.rotation.y = -f.facing*s*0.4;
-
-  f.rightArm.shoulder.rotation.x = -s*1.1;
-  f.rightArm.shoulder.rotation.z = f.facing*s*0.5;
-  f.rightArm.elbow.rotation.x    = -1.5 + s*0.3;
-}
 
 function resetAttackPose(f){
   // TEMPORARY (step 2 of the model swap): the new boxers expose userData.bones, not these
@@ -2174,26 +2172,14 @@ function updateAttackAnim(f, opponent, dt){
   if(!anim) return;
   anim.t += dt;
   const p = Math.min(1, anim.t/anim.dur);
-  const swing = Math.sin(p*Math.PI);
   const sk = SPECIAL_SKILLS[anim.type];
 
-  // TEMPORARY (step 2 of the model swap): posing is retargeted to userData.bones in the next
-  // commit. Only the pose is skipped -- the hit window, damage and KO below stay live.
-  if(f.torso){
-    if(sk){
-      sk.anim(f, p);
-    } else if(anim.type==='light'){
-      f.rightArm.shoulder.rotation.x = -swing*2.1;
-      f.rightArm.elbow.rotation.x = -swing*0.5;
-    } else {
-      f.leftArm.shoulder.rotation.x = -swing*2.6;
-      f.leftArm.elbow.rotation.x = -swing*0.7;
-      f.torso.rotation.y = -f.facing*swing*0.35;
-    }
-  }
-
-  const hitWindowStart = sk ? sk.hitStart : (anim.type==='light' ? 0.4 : 0.48);
-  const hitWindowEnd   = sk ? sk.hitEnd   : (anim.type==='light' ? 0.6 : 0.68);
+  // The clip does the posing -- it was started in startAttack and is driven by anim.update(dt).
+  // Damage lands across the clip's strike hold, converted to a fraction of the clip.
+  const strike = CLIP_STRIKE[anim.clip] || [0.4, 0.6];
+  const clipDur = clipDuration(anim.clip) || 1;
+  const hitWindowStart = strike[0] / clipDur;
+  const hitWindowEnd   = strike[1] / clipDur;
   if(!anim.hit && p>=hitWindowStart && p<=hitWindowEnd){
     const dist = f.group.position.distanceTo(opponent.group.position);
     const range = sk ? sk.range : (anim.type==='light' ? 1.45 : 1.75);
@@ -2346,6 +2332,11 @@ function fightLoop(){
   
   requestAnimationFrame(fightLoop);
   const dt = Math.min(0.05, clock.getDelta());
+
+  // Attack clips run off the mixer, so tick every fighter's animator regardless of match state:
+  // a clip already in flight when the bell goes still has to finish back into the guard.
+  if(p1F && p1F.anim) p1F.anim.update(dt);
+  if(p2F && p2F.anim) p2F.anim.update(dt);
 
   // Explore mode drives the camera itself; it only ever runs before the bell.
   if(viewMode === 'fps' && fpsControls && fpsControls.isLocked) moveExplore(dt);
