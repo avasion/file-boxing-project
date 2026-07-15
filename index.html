@@ -17,6 +17,9 @@
     --gold:#d4af37;
     --text:#e9e9ec;
     --muted:#8a8a92;
+    /* Menu grid: the left column and gutter, shared with the select bar's centring below. */
+    --menuCol1:260px;
+    --menuGap:10px;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{
@@ -31,9 +34,9 @@
   #menuScreen{
     position:absolute; inset:0;
     display:grid;
-    grid-template-columns: 260px 1fr 300px;
+    grid-template-columns: var(--menuCol1) 1fr 300px;
     grid-template-rows: 1fr auto;
-    gap:10px;
+    gap:var(--menuGap);
     padding:12px 18px;
     background:
       radial-gradient(ellipse at 50% -10%, #241014 0%, transparent 55%),
@@ -215,7 +218,13 @@
   #startMatchBtn.disabled{ opacity:.35; pointer-events:none; box-shadow:none; }
 
   /* bottom: character select */
-  #selectBar{ grid-column:2/4; display:flex; flex-direction:column; gap:8px; }
+  /* #leftCol spans both rows, so the select bar can only start at column 2 -- centring its
+     contents would centre them on columns 2-3, sitting half the left column right of the window.
+     Reserving that width on the right puts the tabs and the cards back on the page's centre. */
+  #selectBar{
+    grid-column:2/4; display:flex; flex-direction:column; gap:8px;
+    padding-right: calc(var(--menuCol1) + var(--menuGap));
+  }
   #selectTabs{ display:flex; gap:10px; align-items:center; justify-content:center; }
   .slotTab{
     padding:8px 22px; font-size:14px; letter-spacing:3px; cursor:pointer;
@@ -1290,6 +1299,12 @@ let previewCharIdx = 0;
   fighter.position.y = PREVIEW_CANVAS_TOP + PREVIEW_FOOT_OFFSET;
   scene.add(fighter);
 
+  // The preview boxer breathes in the guard rather than standing in the rig's T-pose. Same
+  // animator the fighters use, so the card shows the stance you start the round in.
+  const previewAnim = window.ANIM.createFighterAnimator(fighter);
+  previewAnim.play('idle');
+  const previewClock = new THREE.Clock();
+
   const postGeo = new THREE.CylinderGeometry(0.05,0.05,2.2,8);
   const postMat = new THREE.MeshStandardMaterial({color:0x333});
   [[2.9,2.9],[-2.9,2.9],[2.9,-2.9],[-2.9,-2.9]].forEach(([x,z])=>{
@@ -1314,16 +1329,10 @@ let previewCharIdx = 0;
     camera.position.z = Math.cos(t)*7.5;
     camera.lookAt(0,0.8,0);
 
-    // Breathe lifts off the canvas but never dips below it, so the boots stay planted.
-    const breathe = (Math.sin(t*1.2)*0.5 + 0.5) * 0.05;
+    // The idle clip does the breathing, off the hips, so the boots stay planted on the mat.
+    previewAnim.update(previewClock.getDelta());
     const sway = Math.sin(t*0.8)*0.08;
-    fighter.position.y = PREVIEW_CANVAS_TOP + PREVIEW_FOOT_OFFSET + breathe;
     fighter.rotation.y = sway*0.3;
-    // Sway the shoulders only -- rotating every child swung the legs about their centres
-    // and pushed the feet through the mat.
-    // TEMPORARY (step 2 of the model swap): the boxer exposes userData.bones, not .shoulders.
-    // Retargeted in the next commit; skip the sway rather than throw until then.
-    (fighter.userData.shoulders || []).forEach(s => { s.rotation.x = Math.sin(t*1.5)*0.1; });
 
     renderer.render(scene,camera);
   }
