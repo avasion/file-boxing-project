@@ -781,7 +781,7 @@ window.AUDIO = (function(){
 <script type="module">
 (async () => {
   try {
-    const [THREE, gym, ring, stands, plc, oc, chars, anims] = await Promise.all([
+    const [THREE, gym, ring, stands, plc, oc, chars, anims, tex, npcs] = await Promise.all([
       import('three'),
       import('./src/arena/gym.js'),
       import('./src/arena/ring.js'),
@@ -790,6 +790,8 @@ window.AUDIO = (function(){
       import('three/addons/controls/OrbitControls.js'),
       import('./src/characterMap.js'),
       import('./src/arena/animations.js'),
+      import('./src/arena/textures.js'),
+      import('./src/arena/npcs.js'),
     ]);
     window.CHARACTER_MAP = chars;
     window.ANIM = anims;
@@ -800,6 +802,8 @@ window.AUDIO = (function(){
       buildStands: stands.buildStands,
       RING: ring.RING,
       GYM: gym.GYM,
+      ROSTER: npcs.ROSTER,
+      fighterPosterTexture: tex.fighterPosterTexture,
       standHeightAt: stands.standHeightAt,
       PointerLockControls: plc.PointerLockControls,
       OrbitControls: oc.OrbitControls,
@@ -1312,6 +1316,14 @@ document.getElementById('startMatchBtn').addEventListener('click', ()=>{
   document.getElementById('menuScreen').style.display='none';
   document.getElementById('fightScreen').style.display='block';
   startMatch();
+  // Your walkout track starts on the click -- waiting until the walk began put the music several
+  // beats behind the fighter. It has to go after startMatch, which opens by stopping everything to
+  // cut the menu music. No duration cap: explore has no fixed length, and the opponent's walkout or
+  // the bell is what takes it off. If the entrance already started it, leave it where it is.
+  try{
+    const key = (CHARACTERS[picks.p1].name||'').toUpperCase();
+    if(window.AUDIO && !window.AUDIO.isPlaying(key)) window.AUDIO.play(key);
+  }catch(e){}
 });
 
 /* The ring the fight is fought in, and the factor that takes the arena's own units into the
@@ -1541,10 +1553,39 @@ function buildArenaLighting(){
     point('#e8d9b0', 700, 100, 2, [hx, 48, hz]);
 }
 
+/* The gym prints its fight card straight off ROSTER, so the runway posters carry the arena's own
+ * names -- BEAR, MASCARA -- rather than the boxers the game calls them. Re-print each one under the
+ * game's name for that entry. gym.js builds them from ROSTER in order as the only 7.5x10 planes in
+ * the room, so match on that and leave the wall alone if that ever stops being true, rather than
+ * relabelling the wrong poster. */
+function relabelPosters(arena){
+  const { fighterPosterTexture, ROSTER } = window.ARENA;
+  const { gameNameForRoster } = window.CHARACTER_MAP;
+  const posters = [];
+  arena.traverse(o => {
+    const g = o.isMesh && o.geometry;
+    if(g && g.type === 'PlaneGeometry' && g.parameters.width === 7.5 && g.parameters.height === 10) posters.push(o);
+  });
+  if(posters.length !== ROSTER.length){
+    console.warn(`relabelPosters: found ${posters.length} posters for ${ROSTER.length} contenders; leaving the names as authored`);
+    return;
+  }
+  posters.forEach((poster, i) => {
+    const gameName = gameNameForRoster(ROSTER[i].name);
+    if(!gameName) return;
+    const art = fighterPosterTexture({ ...ROSTER[i], name: gameName });
+    poster.material.map.dispose();       // map and emissiveMap are the one texture
+    poster.material.map = art;
+    poster.material.emissiveMap = art;   // gym.js self-lights the print off the same texture
+    poster.material.needsUpdate = true;
+  });
+}
+
 function buildArena(){
   const { buildGym, buildRing, buildStands, RING } = window.ARENA;
   const arena = new THREE.Group();
   buildGym(arena);
+  relabelPosters(arena);
   buildRing(arena);
   arenaCrowd = buildStands(arena);
   arena.scale.setScalar(ARENA_SCALE);
@@ -2058,7 +2099,9 @@ function runEntranceSequence(){
   async function walkOn(fighter, label){
     try{
       const key = (fighter.name||'').toUpperCase();
-      if(window.AUDIO) window.AUDIO.play(key, { durationMs: 6400 });
+      // The player's track is already running from the START MATCH click; restarting it here would
+      // drop the music back to the top just as they step out. The opponent's still starts here.
+      if(window.AUDIO && !window.AUDIO.isPlaying(key)) window.AUDIO.play(key, { durationMs: 6400 });
     }catch(e){}
     nowEl.style.opacity=0;
     whoEl.style.opacity=0;

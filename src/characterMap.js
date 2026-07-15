@@ -74,6 +74,12 @@ export function characterConfig(id, overrides) {
   return config;
 }
 
+/** The game character that wears a given ROSTER entry, or null if none does. */
+export function gameNameForRoster(rosterName) {
+  const hit = Object.entries(CHARACTER_MODELS).find(([, m]) => m.roster === rosterName);
+  return hit ? hit[0] : null;
+}
+
 /**
  * Build a character's boxer. Returns a THREE.Group with userData.bones, at the arena's own
  * scale -- callers place and rescale it for whatever scene they are putting it in.
