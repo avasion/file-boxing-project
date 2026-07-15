@@ -258,14 +258,46 @@
 
   #hud{ position:absolute; top:0; left:0; right:0; padding:18px 26px; display:flex; align-items:flex-start; justify-content:space-between; z-index:5; pointer-events:none;}
   .hpBlock{ width:34%; }
-  .hpName{ display:flex; justify-content:space-between; font-size:16px; letter-spacing:2px; margin-bottom:4px;}
-  .hpBar{ height:16px; background:#1a1a1e; border:1px solid #333; position:relative; }
-  .hpFill{ height:100%; width:100%; transition:width .15s; }
-  .p1 .hpFill{ background:linear-gradient(90deg,#0d63c9,#4fb2ff); }
-  .p2 .hpFill{ background:linear-gradient(90deg,#ff5158,#c9130d); margin-left:auto; }
-  .p2 .hpBar{ direction:rtl; }
-  .p1 .hpName{ color:#4fb2ff; }
-  .p2 .hpName{ color:#ff5158; }
+
+  /* Name plate: solid block of the fighter's own colour, set from CHARACTERS at match start. */
+  .hpName{
+    display:flex; font-size:20px; font-weight:700; letter-spacing:2px; color:#fff;
+    padding:3px 10px; background:#555; text-shadow:0 1px 2px rgba(0,0,0,.6);
+  }
+  .p2 .hpName{ justify-content:flex-end; }
+
+  /* Stamina: the long bar under the plate, draining towards the fighter's own side. */
+  .staBar{
+    position:relative; height:22px; margin-top:2px; background:#1a1a1e;
+    border:1px solid #cfc9b4; overflow:hidden;
+  }
+  /* Each fighter's stamina drains away from their own plate, so the spent end is the one furthest
+     from their name -- p1 empties to the right, p2 to the left. */
+  .staFill{
+    position:absolute; top:0; bottom:0; left:0; width:100%;
+    background:linear-gradient(90deg,#f5e12a,#e8a01c); transition:width .12s linear;
+  }
+  .p2 .staFill{ left:auto; right:0; background:linear-gradient(270deg,#f5e12a,#e8a01c); }
+  .staLabel{
+    position:absolute; top:0; left:8px; line-height:22px; font-size:12px; letter-spacing:2px;
+    color:#111; font-weight:600; text-shadow:0 1px 0 rgba(255,255,255,.25);
+  }
+  .p2 .staLabel{ left:auto; right:8px; }
+
+  /* BODY / HEAD / BLOCK: short bars that read damage per region. */
+  .regionRow{ display:flex; align-items:center; gap:10px; margin-top:7px; }
+  .p2 .regionRow{ flex-direction:row-reverse; }
+  .rLabel{ font-size:12px; letter-spacing:2px; color:#8a8a92; width:52px; }
+  .p2 .rLabel{ text-align:right; }
+  .rTrack{ position:relative; width:38%; height:7px; background:#2b2b2f; overflow:hidden; }
+  .rFill{
+    position:absolute; top:0; bottom:0; left:0; width:100%; transition:width .12s linear;
+  }
+  .p2 .rFill{ left:auto; right:0; }
+  .rFill.head, .rFill.body{ background:linear-gradient(90deg,#ff3a20,#ff7a3a); }
+  .rFill.blk{ background:linear-gradient(90deg,#3ad16a,#9ef08a); }
+  /* Guard gone: the block bar reads red until it recovers enough to hold again. */
+  .rFill.blk.broken{ background:linear-gradient(90deg,#8a1f14,#c9301c); }
   #clock{ font-family:'Bebas Neue'; font-size:40px; letter-spacing:2px; color:#fff; text-shadow:0 0 10px rgba(0,0,0,.8); }
   #clockWrap{ text-align:center; }
   #roundLabel{ font-size:11px; letter-spacing:4px; color:var(--gold); text-align:center; }
@@ -579,21 +611,27 @@
 
     <div id="hud" class="hidden">
       <div class="hpBlock p1">
-        <div class="hpName"><span id="p1Name">YOU</span><span id="p1Pct">100</span></div>
-        <div class="hpBar"><div class="hpFill" id="p1Fill"></div></div>
+        <div class="hpName" id="p1Plate"><span id="p1Name">YOU</span></div>
+        <div class="staBar"><div class="staFill" id="p1Sta"></div><span class="staLabel">STAMINA</span></div>
+        <div class="regionRow"><span class="rLabel">BODY</span><span class="rTrack"><span class="rFill body" id="p1Body"></span></span></div>
+        <div class="regionRow"><span class="rLabel">HEAD</span><span class="rTrack"><span class="rFill head" id="p1Head"></span></span></div>
+        <div class="regionRow"><span class="rLabel">BLOCK</span><span class="rTrack"><span class="rFill blk" id="p1Block"></span></span></div>
       </div>
       <div id="clockWrap">
         <div id="roundLabel">VS CPU</div>
         <div id="clock">2:00</div>
       </div>
       <div class="hpBlock p2">
-        <div class="hpName"><span id="p2Pct">100</span><span id="p2Name">CPU</span></div>
-        <div class="hpBar"><div class="hpFill" id="p2Fill"></div></div>
+        <div class="hpName" id="p2Plate"><span id="p2Name">CPU</span></div>
+        <div class="staBar"><div class="staFill" id="p2Sta"></div><span class="staLabel">STAMINA</span></div>
+        <div class="regionRow"><span class="rLabel">BODY</span><span class="rTrack"><span class="rFill body" id="p2Body"></span></span></div>
+        <div class="regionRow"><span class="rLabel">HEAD</span><span class="rTrack"><span class="rFill head" id="p2Head"></span></span></div>
+        <div class="regionRow"><span class="rLabel">BLOCK</span><span class="rTrack"><span class="rFill blk" id="p2Block"></span></span></div>
       </div>
     </div>
 
     <div id="controlsHint" class="hidden">
-      <span id="controlsHintBase">MOVE&#58;WASD&#8195;JAB&#58;J&#8195;POWER PUNCH&#58;K&#8195;BLOCK&#58;SHIFT</span>
+      <span id="controlsHintBase">MOVE&#58;WASD&#8195;JAB&#58;J (HEAD)&#8195;POWER PUNCH&#58;K (BODY)&#8195;BLOCK&#58;SHIFT</span>
       <span id="controlsHintSpecials" style="display:none;"></span>
     </div>
 
@@ -777,19 +815,19 @@ const SPECIAL_SKILLS = {
   uppercut: {
     name:'UPPERCUT', cost:5, key:'KeyU', keyLabel:'U',
     hint:'Rising inside shot',
-    dur:0.62, range:1.5, dmgMin:16, dmgMax:24,
+    dur:0.62, range:1.5, dmgMin:16, dmgMax:24, target:'head', staCost:22,
     hitStart:0.45, hitEnd:0.65, anim:animUppercut,
   },
   haymaker: {
     name:'HAYMAKER', cost:10, key:'KeyI', keyLabel:'I',
     hint:'Wide overhand, slow wind-up',
-    dur:0.85, range:1.9, dmgMin:22, dmgMax:32,
+    dur:0.85, range:1.9, dmgMin:22, dmgMax:32, target:'head', staCost:30,
     hitStart:0.55, hitEnd:0.72, anim:animHaymaker,
   },
   liverShot: {
     name:'LIVER SHOT', cost:15, key:'KeyO', keyLabel:'O',
     hint:'Body blow, pierces block',
-    dur:0.5, range:1.4, dmgMin:12, dmgMax:18,
+    dur:0.5, range:1.4, dmgMin:12, dmgMax:18, target:'body', staCost:20,
     hitStart:0.4, hitEnd:0.6, anim:animLiverShot,
     piercesBlock:true,
   },
@@ -911,7 +949,7 @@ function updateControlsHint(){
   fightHint.style.display = owned.length ? '' : 'none';
 
   const setup = document.getElementById('setupControls');
-  setup.innerHTML = 'MOVE: WASD<br>JAB: J POWER PUNCH: K BLOCK: SHIFT'
+  setup.innerHTML = 'MOVE: WASD<br>JAB: J (HEAD) POWER PUNCH: K (BODY) BLOCK: SHIFT'
     + (owned.length ? `<br><span style="color:var(--gold);">${text}</span>` : '');
 }
 
@@ -1667,9 +1705,16 @@ function createFighter(charData, side){
   const up = (side==='player') ? playerUpgrades : cpuUpgrades;
   const maxHp = 100 + (up.hp||0) * 10;
   const damageMul = 1 + (up.damage||0) * 0.08;
-  const stamina = (up.stamina||0) * 0.12; // affects attack speed / cooldown
+  const staminaBonus = (up.stamina||0) * 0.12; // affects attack speed / cooldown
   const energy = (up.energy||0) * 0.12;   // affects block effectiveness
   const blockReduction = Math.max(0.08, 0.22 - (up.energy||0) * 0.03);
+
+  // Health is split across the two regions the HUD reads, halving maxHp so hp stays the sum of
+  // the pair and the KO threshold is unchanged. The stamina and block meters back the other two
+  // HUD bars; the Stamina and Energy upgrades deepen their pools on top of their existing effects.
+  const headMax = maxHp / 2, bodyMax = maxHp / 2;
+  const staminaMax = 100 + (up.stamina||0) * 8;
+  const blockMax = 100 + (up.energy||0) * 8;
 
   // The arena's key spot is the scene's shadow caster; let the fighters drop shadows on the canvas
   // the way the arena's own voxel figures do.
@@ -1679,7 +1724,10 @@ function createFighter(charData, side){
     group, torso, head, rightArm, leftArm, rightLeg, leftLeg,
     color:charData.color, name:charData.name,
     maxHp: maxHp, hp: maxHp, blocking:false,
-    damageMul: damageMul, stamina: stamina, energy: energy, blockReduction: blockReduction,
+    headMax, bodyMax, headHp: headMax, bodyHp: bodyMax,
+    staminaMax, staminaMeter: staminaMax,
+    blockMax, blockMeter: blockMax, guardBroken:false,
+    damageMul: damageMul, staminaBonus: staminaBonus, energy: energy, blockReduction: blockReduction,
     attackAnim:null,
     walkPhase:0,
     facing:1,
@@ -1750,11 +1798,62 @@ function handleAttackKey(code){
   }
 }
 
+/* ----- METERS -----
+ * Stamina is spent to throw and comes back when you don't; block drains while the guard is up and
+ * when it eats a shot, and a guard that empties is broken until it recovers past GUARD_RECOVER. */
+const STAMINA_COST = { light:8, heavy:18 };
+const STAMINA_REGEN = 15;          // per second, idle
+const STAMINA_REGEN_BLOCKING = 6;  // holding a guard is work
+const BLOCK_DRAIN = 22;            // per second while blocking
+const BLOCK_HIT_DRAIN = 1.6;       // per point of incoming damage absorbed
+const BLOCK_REGEN = 14;            // per second once the guard is down
+const GUARD_RECOVER = 25;          // block meter needed to raise a broken guard again
+
+function attackStaminaCost(type){
+  const sk = SPECIAL_SKILLS[type];
+  return sk ? (sk.staCost || 20) : (STAMINA_COST[type] || 10);
+}
+
+/* Which region a punch lands on. Jab goes upstairs, power punch downstairs, so both HUD bars are
+ * reachable from the base controls; the specials follow the move they describe. */
+function attackTarget(type){
+  const sk = SPECIAL_SKILLS[type];
+  if(sk) return sk.target || 'head';
+  return type === 'light' ? 'head' : 'body';
+}
+
+function applyRegionDamage(f, region, dmg){
+  const first = region === 'head' ? 'headHp' : 'bodyHp';
+  const other = region === 'head' ? 'bodyHp' : 'headHp';
+  const take = Math.min(f[first], dmg);
+  f[first] -= take;
+  // Overflow carries into the other region, so hp stays the sum of the two and a fighter worked
+  // to one side still goes down rather than stalling at a full opposite bar.
+  const spill = dmg - take;
+  if(spill > 0) f[other] = Math.max(0, f[other] - spill);
+  f.hp = f.headHp + f.bodyHp;
+}
+
+function updateMeters(f, dt){
+  if(f.blocking){
+    f.blockMeter = Math.max(0, f.blockMeter - BLOCK_DRAIN * dt);
+    if(f.blockMeter <= 0){ f.guardBroken = true; f.blocking = false; }
+  } else {
+    f.blockMeter = Math.min(f.blockMax, f.blockMeter + BLOCK_REGEN * dt);
+    if(f.guardBroken && f.blockMeter >= GUARD_RECOVER) f.guardBroken = false;
+  }
+  const regen = f.blocking ? STAMINA_REGEN_BLOCKING : STAMINA_REGEN;
+  f.staminaMeter = Math.min(f.staminaMax, f.staminaMeter + regen * dt);
+}
+
 function startAttack(f, type){
   if(f.attackAnim || f.ko) return;
+  const cost = attackStaminaCost(type);
+  if(f.staminaMeter < cost) return;      // too gassed to throw it
+  f.staminaMeter -= cost;
   const sk = SPECIAL_SKILLS[type];
   const baseDur = sk ? sk.dur : (type==='light'?0.3:0.55);
-  const dur = baseDur * Math.max(0.6, 1 - (f.stamina||0)*0.45);
+  const dur = baseDur * Math.max(0.6, 1 - (f.staminaBonus||0)*0.45);
   f.attackAnim = { type, t:0, hit:false, dur };
 }
 
@@ -1841,10 +1940,11 @@ function startMatch(){
 
   document.getElementById('p1Name').textContent = p1F.name;
   document.getElementById('p2Name').textContent = p2F.name + ' (CPU)';
-  document.getElementById('p1Pct').textContent = Math.ceil(p1F.hp);
-  document.getElementById('p2Pct').textContent = Math.ceil(p2F.hp);
-  document.getElementById('p1Fill').style.width = Math.min(100, Math.round((p1F.hp / p1F.maxHp)*100)) + '%';
-  document.getElementById('p2Fill').style.width = Math.min(100, Math.round((p2F.hp / p2F.maxHp)*100)) + '%';
+  // Plate colour is the fighter's own, so the HUD reads as them rather than as a fixed side.
+  const hex = c => '#' + c.toString(16).padStart(6,'0');
+  document.getElementById('p1Plate').style.background = hex(p1F.color);
+  document.getElementById('p2Plate').style.background = hex(p2F.color);
+  updateHpUI();
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('controlsHint').classList.add('hidden');
   document.getElementById('resultScreen').style.display='none';
@@ -2075,7 +2175,8 @@ function updatePlayerControls(f, opponent, K, dt){
     f.walkPhase += dt*8;
     moving = true;
   }
-  f.blocking = !!(keys[K.block] || (K.block2 && keys[K.block2]));
+  // A broken guard cannot be raised until the block meter recovers.
+  f.blocking = !!(keys[K.block] || (K.block2 && keys[K.block2])) && !f.guardBroken && f.blockMeter > 0;
   return moving;
 }
 
@@ -2124,7 +2225,7 @@ function updateCPU(cpu, player, dt){
   }
 
   if(player.attackAnim && dist < 1.9 && cpuState.blockTimer <= 0 && Math.random() < 0.035){
-    cpu.blocking = true;
+    cpu.blocking = !cpu.guardBroken && cpu.blockMeter > 0;
     cpuState.blockTimer = 0.35 + Math.random()*0.5;
   }else if(cpuState.blockTimer <= 0){
     cpu.blocking = false;
@@ -2171,8 +2272,14 @@ function updateAttackAnim(f, opponent, dt){
         ? (sk.dmgMin + Math.random()*(sk.dmgMax - sk.dmgMin))
         : (anim.type==='light' ? (4+Math.random()*5) : (11+Math.random()*8));
       let dmg = dmgBase * (f.damageMul||1);
-      if(opponent.blocking && !(sk && sk.piercesBlock)) dmg *= (opponent.blockReduction||0.22);
-      opponent.hp = Math.max(0, opponent.hp - dmg);
+      const blocked = opponent.blocking && !(sk && sk.piercesBlock);
+      if(blocked){
+        dmg *= (opponent.blockReduction||0.22);
+        // A guard that eats a shot pays for it, and can be broken by enough of them.
+        opponent.blockMeter = Math.max(0, opponent.blockMeter - dmgBase * BLOCK_HIT_DRAIN);
+        if(opponent.blockMeter <= 0){ opponent.guardBroken = true; opponent.blocking = false; }
+      }
+      applyRegionDamage(opponent, attackTarget(anim.type), dmg);
 
       // Damage is banked per fighter and, for the player, into the career total.
       fighterRecord(f.name).damage += dmg;
@@ -2208,13 +2315,23 @@ function flashHit(f){
   f.group.position.z = THREE.MathUtils.clamp(f.group.position.z,-BOUND,BOUND);
 }
 
+/* Every bar in the HUD reads a live meter: head/body are the two halves of hp, stamina is what is
+ * left to throw with, and block is the guard. Called each frame, since stamina and block move
+ * continuously rather than only on a hit. */
+const _hudEls = {};
+function hudEl(id){ return _hudEls[id] || (_hudEls[id] = document.getElementById(id)); }
+
 function updateHpUI(){
-  document.getElementById('p1Pct').textContent = Math.ceil(p1F.hp);
-  document.getElementById('p2Pct').textContent = Math.ceil(p2F.hp);
-  const p1pct = Math.max(0, Math.min(100, (p1F.hp / (p1F.maxHp||100)) * 100));
-  const p2pct = Math.max(0, Math.min(100, (p2F.hp / (p2F.maxHp||100)) * 100));
-  document.getElementById('p1Fill').style.width = p1pct + '%';
-  document.getElementById('p2Fill').style.width = p2pct + '%';
+  for(const [tag, f] of [['p1', p1F], ['p2', p2F]]){
+    if(!f) continue;
+    const pct = (v, max) => Math.max(0, Math.min(100, (v / (max || 1)) * 100)) + '%';
+    hudEl(tag+'Head').style.width  = pct(f.headHp, f.headMax);
+    hudEl(tag+'Body').style.width  = pct(f.bodyHp, f.bodyMax);
+    hudEl(tag+'Sta').style.width   = pct(f.staminaMeter, f.staminaMax);
+    const blk = hudEl(tag+'Block');
+    blk.style.width = pct(f.blockMeter, f.blockMax);
+    blk.classList.toggle('broken', !!f.guardBroken);
+  }
 }
 
 function facePlayers(){
@@ -2306,6 +2423,11 @@ function fightLoop(){
   if(fightActive && !matchOver){
     const m1 = updatePlayerControls(p1F, p2F, P1_KEYS, dt);
     const m2 = updateCPU(p2F, p1F, dt);
+
+    // Stamina and block move continuously, so the meters and their bars tick every frame.
+    updateMeters(p1F, dt);
+    updateMeters(p2F, dt);
+    updateHpUI();
 
     const minDist = 1.1;
     const dvec = new THREE.Vector3().subVectors(p1F.group.position, p2F.group.position);
