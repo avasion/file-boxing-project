@@ -668,15 +668,18 @@
 <script>
 // --- Audio: preload and playback helpers ---
 window.AUDIO = (function(){
-  // startAt trims the dead space each file opens with, so a walkout starts on the music rather
-  // than on silence. Measured off the decoded waveform as the first sample above -60 dBFS:
-  // SICKO 0.153s, Ruff Ryders 0.130s, ZEZE 0.384s, Many Men 0.181s; the wavs open on their first
-  // sample. Re-measure if a file is replaced.
+  // Every character has a walkout track, in roster order. startAt trims the dead space each file
+  // opens with, so a walkout starts on the music rather than on silence -- measured off the decoded
+  // waveform as the first sample above -60 dBFS. Wu-Tang carries the most, at over 4/5 of a second.
+  // The wavs open on their first sample. Re-measure if a file is replaced.
   const sounds = {
     menu:      { src:'sound/Menu Music.wav', startAt:0 },
+    BLAZE:     { src:'sound/Wu-Tang Clan - (Instrumental).mp3', startAt:0.804 },
     REAPER:    { src:'sound/Travis Scott - SICKO MODE (Instrumental).mp3', startAt:0.153 },
     PHOENIX:   { src:'sound/DMX - Ruff Ryders Anthem.mp3', startAt:0.130 },
+    TITAN:     { src:'sound/Dr. Dre - Still D.R.E. (Instrumental).mp3', startAt:0.161 },
     VIPER:     { src:'sound/Kodak Black - ZEZE.mp3', startAt:0.384 },
+    KAIJU:     { src:'sound/Hypnotize (Instrumental) (2014 Remaster).mp3', startAt:0.119 },
     SHOCKWAVE: { src:'sound/50 Cent - Many Men) (Instrumental).mp3', startAt:0.181 }
   };
 
