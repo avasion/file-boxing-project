@@ -707,7 +707,7 @@ window.AUDIO = (function(){
 
   /* The crowd is its own channel: it runs underneath the round rather than taking the one slot the
      walkout tracks share, and its gain rides the crowd's excitement. */
-  const CROWD_BASE = 0.30, CROWD_PEAK = 0.62;
+  const CROWD_BASE = 0.45, CROWD_PEAK = 0.93;
   const crowdEl = new Audio('sound/Crowd sounds.wav');
   crowdEl.preload = 'auto';
   crowdEl.loop = true;
@@ -1581,7 +1581,7 @@ function buildArenaLighting(){
  * relabelling the wrong poster. */
 function relabelPosters(arena){
   const { fighterPosterTexture, ROSTER } = window.ARENA;
-  const { gameNameForRoster } = window.CHARACTER_MAP;
+  const { posterNameForRoster } = window.CHARACTER_MAP;
   const posters = [];
   arena.traverse(o => {
     const g = o.isMesh && o.geometry;
@@ -1592,9 +1592,9 @@ function relabelPosters(arena){
     return;
   }
   posters.forEach((poster, i) => {
-    const gameName = gameNameForRoster(ROSTER[i].name);
-    if(!gameName) return;
-    const art = fighterPosterTexture({ ...ROSTER[i], name: gameName });
+    const name = posterNameForRoster(ROSTER[i].name);
+    if(!name) return;
+    const art = fighterPosterTexture({ ...ROSTER[i], name });
     poster.material.map.dispose();       // map and emissiveMap are the one texture
     poster.material.map = art;
     poster.material.emissiveMap = art;   // gym.js self-lights the print off the same texture

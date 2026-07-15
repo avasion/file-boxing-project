@@ -21,6 +21,7 @@ const CUSTOM_KEY = 'boxing_user_look';
  *   roster: entry name in ROSTER
  *   scale:  overrides that entry's own scale (USER stands at 1.0, not Kid's 0.92)
  *   custom: this character reads the stored player customization
+ *   posterName: what the gym's fight card calls them, where the character id would read oddly
  */
 export const CHARACTER_MODELS = {
   BLAZE:     { roster: 'Rojo' },      // red & gold, big hair
@@ -30,7 +31,7 @@ export const CHARACTER_MODELS = {
   VIPER:     { roster: 'Sugar' },     // green gloves and boots, purple trunks
   KAIJU:     { roster: 'Mascara' },   // blue luchador mask, magenta gloves
   SHOCKWAVE: { roster: 'Bruiser' },   // all-magenta, full beard
-  USER:      { roster: 'Kid', scale: 1.0, custom: true }, // dark trunks, blue gloves
+  USER:      { roster: 'Kid', scale: 1.0, custom: true, posterName: 'IGNITE' }, // dark trunks, blue gloves
 };
 
 const BY_NAME = Object.fromEntries(ROSTER.map(e => [e.name, e]));
@@ -74,10 +75,13 @@ export function characterConfig(id, overrides) {
   return config;
 }
 
-/** The game character that wears a given ROSTER entry, or null if none does. */
-export function gameNameForRoster(rosterName) {
+/**
+ * The name the gym's fight card should print for a given ROSTER entry: the character that wears
+ * it, or the display name that character overrides with. Null if no character wears it.
+ */
+export function posterNameForRoster(rosterName) {
   const hit = Object.entries(CHARACTER_MODELS).find(([, m]) => m.roster === rosterName);
-  return hit ? hit[0] : null;
+  return hit ? (hit[1].posterName ?? hit[0]) : null;
 }
 
 /**
